@@ -6,6 +6,7 @@ from sqlmodel import select
 from bidcopilot.core.database import get_session
 from bidcopilot.core.models import Job, JobStatus, DiscoveryRun, CareerSource
 from bidcopilot.discovery.base_adapter import AdapterRegistry, SearchParams, BaseJobSiteAdapter
+import bidcopilot.discovery.adapters  # noqa: F401 — trigger adapter registration
 from bidcopilot.profile.schemas import UserProfile
 from bidcopilot.utils.logging import get_logger
 

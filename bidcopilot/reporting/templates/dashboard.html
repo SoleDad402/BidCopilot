@@ -4,8 +4,8 @@
 
 {% block status_text %}Connecting...{% endblock %}
 
-{% block head_extra %}
-<style>
+{% block head_extra_inner %}
+
     /* ================================================================
        LAYOUT
        ================================================================ */
@@ -289,7 +289,6 @@
         .stats-row { grid-template-columns: 1fr; }
         .stat-value { font-size: 2rem; }
     }
-</style>
 {% endblock %}
 
 {% block body %}
@@ -549,7 +548,6 @@
                     '<option value="">Change...</option>' +
                     '<option value="new">New</option>' +
                     '<option value="matched">Matched</option>' +
-                    '<option value="applied">Applied</option>' +
                     '<option value="rejected">Rejected</option>' +
                     '</select></td>' +
                     '</tr>';
@@ -625,7 +623,6 @@
                     '</div>' +
                     '<div class="queue-item-actions">' +
                     (sc != null ? '<span class="score ' + scoreClass + '">' + sc + '</span>' : '') +
-                    '<button class="btn btn-success btn-sm" onclick="updateJobStatus(' + j.id + ',\'applied\')">Approve</button>' +
                     '<button class="btn btn-outline btn-sm" onclick="updateJobStatus(' + j.id + ',\'rejected\')">Skip</button>' +
                     '</div></div></div>';
             }).join('');
@@ -706,17 +703,42 @@
         var origText = btn.textContent;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner spinner-sm"></span> Running...';
+
         api('/api/pipeline/' + action, {method: 'POST'}).then(function(d) {
-            showToast(d.message || 'Pipeline triggered', 'success');
-            loadStats();
-            if (action === 'discover') {
-                loadSources();
-                loadActivity();
-            } else {
-                loadJobs(jobPage);
-                loadQueue(queuePage);
+            if (d.ok === false) {
+                showToast(d.message, 'warning');
+                btn.disabled = false;
+                btn.textContent = origText;
+                return;
             }
-        }).catch(function() {}).then(function() {
+            showToast(d.message || 'Pipeline started', 'info');
+
+            // Poll until pipeline finishes
+            var pollKey = action === 'discover' ? 'discovery' : 'matching';
+            var pollInterval = setInterval(function() {
+                api('/api/stats').then(function(stats) {
+                    var ps = (stats.pipeline || {})[pollKey] || {};
+                    if (ps.status !== 'running') {
+                        clearInterval(pollInterval);
+                        btn.disabled = false;
+                        btn.textContent = origText;
+                        if (ps.status === 'error') {
+                            showToast(capitalize(action) + ' failed: ' + (ps.error || 'unknown'), 'error');
+                        } else {
+                            var msg = capitalize(action) + ' complete';
+                            if (ps.total_found !== undefined) msg += ': ' + ps.total_found + ' found, ' + ps.total_new + ' new';
+                            showToast(msg, 'success');
+                        }
+                        // Reload all data
+                        loadStats();
+                        loadJobs(1);
+                        loadQueue(1);
+                        loadSources();
+                        loadActivity();
+                    }
+                }).catch(function() {});
+            }, 2000);
+        }).catch(function() {
             btn.disabled = false;
             btn.textContent = origText;
         });

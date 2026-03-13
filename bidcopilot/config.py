@@ -49,7 +49,16 @@ class Config(BaseSettings):
     profile_path: str = "config/profile.yaml"
     settings_path: str = "config/settings.yaml"
     enabled_sites: list[str] = Field(
-        default_factory=lambda: ["remoteok", "weworkremotely", "greenhouse", "lever"]
+        default_factory=lambda: [
+            # Tier 1: Free public API adapters
+            "remoteok", "remotive", "himalayas", "jobicy", "arbeitnow", "jobright",
+            # ATS platforms (need CareerSource records to work)
+            "greenhouse", "lever", "ashby",
+            # Scraping adapters
+            "weworkremotely", "hn_hiring",
+            # Reed.co.uk requires REED_API_KEY env var
+            # "reed",
+        ]
     )
     llm: LLMConfig = Field(default_factory=LLMConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)

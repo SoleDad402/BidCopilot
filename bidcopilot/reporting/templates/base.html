@@ -12,20 +12,21 @@
     <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/animations.css">
+    <style id="page-styles">{% block head_extra_inner %}{% endblock %}</style>
     {% block head_extra %}{% endblock %}
 </head>
-<body class="page-enter">
+<body>
 
-<!-- HEADER -->
+<!-- HEADER (persists across navigation) -->
 <header class="header">
     <div class="header-left">
-        <a href="/" class="header-brand">
+        <a href="/" class="header-brand" data-nav>
             <div class="logo-mark">BC</div>
             <span class="header-title">BidCopilot Command Center</span>
         </a>
-        <nav class="header-nav">
-            <a href="/" {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
-            <a href="/profile" {% if active_page == 'profile' %}class="active"{% endif %}>Profile</a>
+        <nav class="header-nav" id="mainNav">
+            <a href="/" data-nav {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+            <a href="/profile" data-nav {% if active_page == 'profile' %}class="active"{% endif %}>Profile</a>
         </nav>
     </div>
     <div class="header-right">
@@ -36,14 +37,24 @@
     </div>
 </header>
 
-<!-- TOAST CONTAINER -->
+<!-- TOAST CONTAINER (persists across navigation) -->
 <div class="toast-container" id="toasts"></div>
 
+<!-- PAGE CONTENT (swapped on navigation) -->
+<div id="page-content">
 {% block body %}{% endblock %}
+</div>
 
 <!-- Shared Utilities -->
 <script src="/static/js/utils.js"></script>
+
+<!-- Page Script (swapped on navigation) -->
+<div id="page-script">
 {% block scripts %}{% endblock %}
+</div>
+
+<!-- Client-Side Router -->
+<script src="/static/js/router.js"></script>
 
 </body>
 </html>

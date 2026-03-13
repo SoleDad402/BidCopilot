@@ -15,11 +15,14 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, case, text
 from sqlmodel import select
 
+from bidcopilot.config import Config
 from bidcopilot.core.database import get_session, init_db
 from bidcopilot.core.models import (
     Job, JobStatus, Application, ApplicationStatus,
     DiscoveryRun, CareerSource,
 )
+from bidcopilot.discovery.engine import DiscoveryEngine
+from bidcopilot.matching.engine import MatchingEngine
 from bidcopilot.profile.manager import ProfileManager
 from bidcopilot.profile.schemas import UserProfile, SkillEntry, Education, WorkExperience
 from bidcopilot.utils.logging import get_logger
@@ -30,7 +33,8 @@ app = FastAPI(title="BidCopilot Command Center")
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-_profile_manager = ProfileManager()
+_config = Config()
+_profile_manager = ProfileManager(_config.profile_path)
 
 # --- Stats cache ---
 _stats_cache: dict = {}
@@ -245,19 +249,70 @@ async def get_activity(limit: int = 20):
 
 # ───── Pipeline Control ─────
 
-@app.post("/api/pipeline/discover")
-async def trigger_discovery(background_tasks: BackgroundTasks):
+async def _run_discovery_task():
+    """Background task: run discovery on all enabled sites."""
     state = _load_pipeline_state()
     state["discovery"] = {"status": "running", "started_at": datetime.utcnow().isoformat()}
     _save_pipeline_state(state)
-    return {"ok": True, "message": "Discovery triggered"}
+    try:
+        profile = _profile_manager.get()
+        engine = DiscoveryEngine(enabled_sites=_config.enabled_sites)
+        result = await engine.run_all(profile)
+        state["discovery"] = {
+            "status": "idle",
+            "last_run": datetime.utcnow().isoformat(),
+            "total_found": result.get("total_found", 0),
+            "total_new": result.get("total_new", 0),
+        }
+        logger.info("dashboard_discovery_complete", **result)
+    except Exception as e:
+        state["discovery"] = {"status": "error", "error": str(e)}
+        logger.error("dashboard_discovery_failed", error=str(e))
+    finally:
+        _save_pipeline_state(state)
+        # Invalidate stats cache so next poll gets fresh data
+        global _stats_cache_time
+        _stats_cache_time = 0
+
+
+async def _run_matching_task():
+    """Background task: score all unscored jobs."""
+    state = _load_pipeline_state()
+    state["matching"] = {"status": "running", "started_at": datetime.utcnow().isoformat()}
+    _save_pipeline_state(state)
+    try:
+        profile = _profile_manager.get()
+        engine = MatchingEngine(min_score=_config.matching.min_match_score)
+        await engine.process_unscored_jobs(profile)
+        state["matching"] = {
+            "status": "idle",
+            "last_run": datetime.utcnow().isoformat(),
+        }
+        logger.info("dashboard_matching_complete")
+    except Exception as e:
+        state["matching"] = {"status": "error", "error": str(e)}
+        logger.error("dashboard_matching_failed", error=str(e))
+    finally:
+        _save_pipeline_state(state)
+        global _stats_cache_time
+        _stats_cache_time = 0
+
+
+@app.post("/api/pipeline/discover")
+async def trigger_discovery(background_tasks: BackgroundTasks):
+    state = _load_pipeline_state()
+    if state.get("discovery", {}).get("status") == "running":
+        return {"ok": False, "message": "Discovery already running"}
+    background_tasks.add_task(_run_discovery_task)
+    return {"ok": True, "message": "Discovery started"}
 
 @app.post("/api/pipeline/match")
 async def trigger_matching(background_tasks: BackgroundTasks):
     state = _load_pipeline_state()
-    state["matching"] = {"status": "running", "started_at": datetime.utcnow().isoformat()}
-    _save_pipeline_state(state)
-    return {"ok": True, "message": "Matching triggered"}
+    if state.get("matching", {}).get("status") == "running":
+        return {"ok": False, "message": "Matching already running"}
+    background_tasks.add_task(_run_matching_task)
+    return {"ok": True, "message": "Matching started"}
 
 
 # ───── Profile API ─────
@@ -331,7 +386,13 @@ async def remove_education(index: int):
 
 @app.on_event("startup")
 async def startup():
-    await init_db()
+    await init_db(_config.db_path)
+    # Reset stale "running" states from previous crashes
+    state = _load_pipeline_state()
+    for key in ["discovery", "matching", "application"]:
+        if state.get(key, {}).get("status") == "running":
+            state[key] = {"status": "idle"}
+    _save_pipeline_state(state)
 
 
 def run_dashboard(host: str = "0.0.0.0", port: int = 8080):

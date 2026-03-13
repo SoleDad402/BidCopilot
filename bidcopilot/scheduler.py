@@ -34,14 +34,14 @@ class BidCopilotScheduler:
                 id="matching_pipeline",
             )
 
-            # Application: every 30 minutes
-            self.scheduler.add_job(
-                self._run_applications,
-                IntervalTrigger(minutes=30),
-                id="application_pipeline",
-            )
+            # Application: PAUSED — focusing on discovery pipeline first
+            # self.scheduler.add_job(
+            #     self._run_applications,
+            #     IntervalTrigger(minutes=30),
+            #     id="application_pipeline",
+            # )
 
-            logger.info("scheduler_configured")
+            logger.info("scheduler_configured", note="application pipeline paused")
         except ImportError:
             logger.warning("apscheduler_not_installed", msg="Install apscheduler for scheduled runs")
 
