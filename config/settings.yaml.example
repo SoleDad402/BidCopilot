@@ -1,0 +1,10 @@
+# BidCopilot Settings — Example Configuration
+# Copy to settings.yaml and customize
+
+enabled_sites:
+  - remoteok
+  - weworkremotely
+  - greenhouse
+  - lever
+  - workday
+  - hn_hiring

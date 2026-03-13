@@ -1,0 +1,1341 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - BidCopilot Command Center{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* ========== MAIN LAYOUT ========== */
+    .main-content {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 32px 24px 120px;
+    }
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 4px;
+    }
+    .page-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 32px;
+    }
+
+    /* ========== SECTION CARDS ========== */
+    .section-card {
+        background: var(--bg-card);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        margin-bottom: 16px;
+        overflow: hidden;
+        transition: border-color var(--transition-fast);
+    }
+    .section-card:hover {
+        border-color: var(--border);
+    }
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        cursor: pointer;
+        user-select: none;
+        transition: background var(--transition-fast);
+    }
+    .section-header:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .section-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .section-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+    .section-icon.identity { background: var(--accent-subtle); color: var(--accent); }
+    .section-icon.professional { background: var(--blue-subtle); color: var(--blue); }
+    .section-icon.skills { background: var(--warning-subtle); color: var(--warning); }
+    .section-icon.work { background: var(--purple-subtle); color: var(--purple); }
+    .section-icon.education { background: var(--cyan-subtle); color: var(--cyan); }
+    .section-icon.preferences { background: var(--success-subtle); color: var(--success); }
+    .section-icon.settings { background: var(--orange-subtle); color: var(--orange); }
+    .section-icon.notifications { background: var(--violet-subtle); color: var(--violet); }
+    .section-title {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .section-desc {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 1px;
+    }
+    .section-chevron {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-dim);
+        transition: transform var(--transition-normal);
+        flex-shrink: 0;
+    }
+    .section-card.collapsed .section-chevron {
+        transform: rotate(-90deg);
+    }
+    .section-body {
+        max-height: 3000px;
+        overflow: hidden;
+        transition: max-height 0.35s ease, opacity 0.25s ease;
+        opacity: 1;
+    }
+    .section-card.collapsed .section-body {
+        max-height: 0;
+        opacity: 0;
+    }
+    .section-inner {
+        padding: 0 24px 24px;
+        border-top: 1px solid var(--border-subtle);
+    }
+
+    /* ========== INLINE ADD FORM ========== */
+    .inline-add-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        align-items: flex-end;
+    }
+    .inline-add-row .form-group {
+        flex: 1;
+    }
+    .inline-add-row .form-label {
+        font-size: 0.6875rem;
+    }
+    .inline-add-row .form-input,
+    .inline-add-row .form-select {
+        padding: 8px 10px;
+        font-size: 0.8125rem;
+    }
+
+    /* ========== WORK HISTORY CARDS ========== */
+    .work-entry {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius);
+        padding: 16px;
+        margin-top: 12px;
+        position: relative;
+    }
+    .work-entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+    .work-entry-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .work-entry-company {
+        font-size: 0.8125rem;
+        color: var(--text-secondary);
+    }
+    .work-entry-dates {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+        margin-top: 2px;
+    }
+    .work-entry-desc {
+        font-size: 0.8125rem;
+        color: var(--text-secondary);
+        margin-top: 8px;
+        line-height: 1.5;
+    }
+    .work-entry-techs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 10px;
+    }
+    .work-entry-techs .tech-tag {
+        font-size: 0.6875rem;
+        padding: 2px 8px;
+        background: var(--blue-subtle);
+        color: var(--blue);
+        border-radius: 10px;
+        font-weight: 500;
+    }
+
+    /* ========== EXPANDABLE ADD FORM ========== */
+    .add-form-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 16px;
+        padding: 10px 14px;
+        background: transparent;
+        border: 1px dashed var(--border);
+        border-radius: var(--radius);
+        color: var(--text-muted);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+        width: 100%;
+        font-family: inherit;
+    }
+    .add-form-toggle:hover {
+        color: var(--text-secondary);
+        border-color: var(--text-dim);
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .add-form-panel {
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transition: max-height 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
+        margin-top: 0;
+    }
+    .add-form-panel.open {
+        max-height: 600px;
+        opacity: 1;
+        margin-top: 12px;
+    }
+    .add-form-panel .form-grid {
+        padding-top: 0;
+    }
+    .add-form-inner {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius);
+        padding: 16px;
+    }
+
+    /* ========== SAVE BAR ========== */
+    .save-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 150;
+        background: var(--glass-bg);
+        backdrop-filter: var(--blur-heavy);
+        -webkit-backdrop-filter: var(--blur-heavy);
+        border-top: 1px solid var(--glass-border);
+        padding: 14px 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+    }
+    .save-bar-inner {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        max-width: 900px;
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .unsaved-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+        opacity: 0;
+        transition: opacity var(--transition-normal);
+    }
+    .unsaved-indicator.visible {
+        opacity: 1;
+    }
+    .unsaved-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--warning);
+    }
+    .btn-save {
+        padding: 10px 28px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border-radius: var(--radius);
+    }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 640px) {
+        .main-content { padding: 20px 16px 120px; }
+        .section-header { padding: 14px 16px; }
+        .section-inner { padding: 0 16px 16px; }
+        .inline-add-row { flex-direction: column; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<!-- MAIN CONTENT -->
+<div class="page-content">
+<main class="main-content">
+    <h1 class="page-title">Profile Settings</h1>
+    <p class="page-subtitle">Manage your identity, skills, preferences, and application configuration.</p>
+
+    <!-- ===== SECTION 1: IDENTITY ===== -->
+    <div class="section-card" data-section="identity">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon identity">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Identity</div>
+                    <div class="section-desc">Personal and contact information</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-input" id="fullName" placeholder="John Doe" data-field="full_name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="email" placeholder="john@example.com" data-field="email">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-input" id="phone" placeholder="+1 (555) 000-0000" data-field="phone">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-input" id="location" placeholder="San Francisco, CA" data-field="location">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">LinkedIn URL</label>
+                        <input type="url" class="form-input" id="linkedinUrl" placeholder="https://linkedin.com/in/..." data-field="linkedin_url">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">GitHub URL</label>
+                        <input type="url" class="form-input" id="githubUrl" placeholder="https://github.com/..." data-field="github_url">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Portfolio URL</label>
+                        <input type="url" class="form-input" id="portfolioUrl" placeholder="https://yoursite.com" data-field="portfolio_url">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 2: PROFESSIONAL ===== -->
+    <div class="section-card" data-section="professional">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon professional">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Professional</div>
+                    <div class="section-desc">Career details and specializations</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Current Title</label>
+                        <input type="text" class="form-input" id="currentTitle" placeholder="Senior Software Engineer" data-field="current_title">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Years of Experience</label>
+                        <input type="number" class="form-input" id="yearsExperience" placeholder="5" min="0" max="50" data-field="years_of_experience">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Target Titles</label>
+                        <div class="tag-input-container" data-tag-field="target_titles">
+                            <div class="tag-list" id="targetTitlesTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type a title and press Enter..." onkeydown="handleTagInput(event, 'targetTitlesTags', 'target_titles')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Specializations</label>
+                        <div class="tag-input-container" data-tag-field="specializations">
+                            <div class="tag-list" id="specializationsTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type a specialization and press Enter..." onkeydown="handleTagInput(event, 'specializationsTags', 'specializations')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Certifications</label>
+                        <div class="tag-input-container" data-tag-field="certifications">
+                            <div class="tag-list" id="certificationsTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type a certification and press Enter..." onkeydown="handleTagInput(event, 'certificationsTags', 'certifications')">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 3: SKILLS ===== -->
+    <div class="section-card" data-section="skills">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon skills">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Skills</div>
+                    <div class="section-desc">Technical skills and proficiency levels</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Level</th>
+                            <th>Years</th>
+                            <th class="cell-actions"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="skillsTableBody">
+                        <!-- populated by JS -->
+                    </tbody>
+                </table>
+                <div class="inline-add-row">
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">Skill Name</label>
+                        <input type="text" class="form-input" id="newSkillName" placeholder="e.g. Python">
+                    </div>
+                    <div class="form-group" style="flex:1.5">
+                        <label class="form-label">Level</label>
+                        <select class="form-select" id="newSkillLevel">
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate" selected>Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                            <option value="expert">Expert</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Years</label>
+                        <input type="number" class="form-input" id="newSkillYears" placeholder="3" min="0" max="50">
+                    </div>
+                    <button class="btn-add" onclick="addSkill()" title="Add skill">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 4: WORK HISTORY ===== -->
+    <div class="section-card" data-section="work">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon work">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Work History</div>
+                    <div class="section-desc">Employment and project experience</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <div id="workHistoryList">
+                    <!-- populated by JS -->
+                </div>
+                <button class="add-form-toggle" onclick="toggleAddForm('workAddPanel', this)" id="workAddToggle">
+                    <span>+</span> Add work experience
+                </button>
+                <div class="add-form-panel" id="workAddPanel">
+                    <div class="add-form-inner">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Company</label>
+                                <input type="text" class="form-input" id="newWorkCompany" placeholder="Acme Corp">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-input" id="newWorkTitle" placeholder="Software Engineer">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Start Date</label>
+                                <input type="text" class="form-input" id="newWorkStart" placeholder="2020-01">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">End Date</label>
+                                <input type="text" class="form-input" id="newWorkEnd" placeholder="2023-06 or Present">
+                            </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-textarea" id="newWorkDesc" placeholder="Key responsibilities and achievements..."></textarea>
+                            </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Technologies</label>
+                                <div class="tag-input-container">
+                                    <div class="tag-list" id="newWorkTechsTags"></div>
+                                    <input type="text" class="tag-input-field" placeholder="Type a technology and press Enter..." onkeydown="handleTempTagInput(event, 'newWorkTechsTags')">
+                                </div>
+                            </div>
+                            <div class="form-group full-width" style="display:flex;flex-direction:row;justify-content:flex-end;">
+                                <button class="btn btn-primary" onclick="addWorkHistory()">Add Experience</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 5: EDUCATION ===== -->
+    <div class="section-card" data-section="education">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon education">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1 4 3 6 3s6-2 6-3v-5"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Education</div>
+                    <div class="section-desc">Academic background</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Degree</th>
+                            <th>Institution</th>
+                            <th>Year</th>
+                            <th>GPA</th>
+                            <th class="cell-actions"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="educationTableBody">
+                        <!-- populated by JS -->
+                    </tbody>
+                </table>
+                <div class="inline-add-row">
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">Degree</label>
+                        <input type="text" class="form-input" id="newEduDegree" placeholder="B.S. Computer Science">
+                    </div>
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">Institution</label>
+                        <input type="text" class="form-input" id="newEduInstitution" placeholder="MIT">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Year</label>
+                        <input type="number" class="form-input" id="newEduYear" placeholder="2020">
+                    </div>
+                    <div class="form-group" style="flex:0.8">
+                        <label class="form-label">GPA</label>
+                        <input type="text" class="form-input" id="newEduGpa" placeholder="3.8">
+                    </div>
+                    <button class="btn-add" onclick="addEducation()" title="Add education">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 6: JOB PREFERENCES ===== -->
+    <div class="section-card" data-section="preferences">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon preferences">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Job Preferences</div>
+                    <div class="section-desc">Work style, salary, and location preferences</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Remote Preference</label>
+                        <select class="form-select" id="remotePreference" data-field="job_preferences.remote_preference">
+                            <option value="remote_only">Remote Only</option>
+                            <option value="hybrid">Hybrid</option>
+                            <option value="onsite">Onsite</option>
+                            <option value="any">Any</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Currency</label>
+                        <select class="form-select" id="salaryCurrency" data-field="job_preferences.currency">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="CAD">CAD</option>
+                            <option value="AUD">AUD</option>
+                            <option value="JPY">JPY</option>
+                            <option value="INR">INR</option>
+                            <option value="CHF">CHF</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Min Salary</label>
+                        <input type="number" class="form-input" id="minSalary" placeholder="80000" data-field="job_preferences.min_salary">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Salary</label>
+                        <input type="number" class="form-input" id="maxSalary" placeholder="150000" data-field="job_preferences.max_salary">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Preferred Locations</label>
+                        <div class="tag-input-container" data-tag-field="job_preferences.preferred_locations">
+                            <div class="tag-list" id="preferredLocationsTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type a location and press Enter..." onkeydown="handleTagInput(event, 'preferredLocationsTags', 'job_preferences.preferred_locations')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Excluded Locations</label>
+                        <div class="tag-input-container" data-tag-field="job_preferences.excluded_locations">
+                            <div class="tag-list" id="excludedLocationsTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type a location and press Enter..." onkeydown="handleTagInput(event, 'excludedLocationsTags', 'job_preferences.excluded_locations')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Company Size Preference</label>
+                        <div class="tag-input-container" data-tag-field="job_preferences.company_size_preference">
+                            <div class="tag-list" id="companySizeTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="e.g. startup, mid-size, enterprise..." onkeydown="handleTagInput(event, 'companySizeTags', 'job_preferences.company_size_preference')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Preferred Industries</label>
+                        <div class="tag-input-container" data-tag-field="job_preferences.preferred_industries">
+                            <div class="tag-list" id="preferredIndustriesTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="e.g. fintech, healthcare, AI..." onkeydown="handleTagInput(event, 'preferredIndustriesTags', 'job_preferences.preferred_industries')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Excluded Industries</label>
+                        <div class="tag-input-container" data-tag-field="job_preferences.excluded_industries">
+                            <div class="tag-list" id="excludedIndustriesTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type an industry and press Enter..." onkeydown="handleTagInput(event, 'excludedIndustriesTags', 'job_preferences.excluded_industries')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Excluded Companies</label>
+                        <div class="tag-input-container" data-tag-field="job_preferences.excluded_companies">
+                            <div class="tag-list" id="excludedCompaniesTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="Type a company name and press Enter..." onkeydown="handleTagInput(event, 'excludedCompaniesTags', 'job_preferences.excluded_companies')">
+                        </div>
+                    </div>
+                </div>
+                <div style="padding-top: 8px;">
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">Visa Sponsorship Needed</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="visaSponsorship" data-field="job_preferences.visa_sponsorship_needed">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">Willing to Relocate</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="willingToRelocate" data-field="job_preferences.willing_to_relocate">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 7: APPLICATION SETTINGS ===== -->
+    <div class="section-card" data-section="settings">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Application Settings</div>
+                    <div class="section-desc">Automation and processing configuration</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Max Applications Per Day</label>
+                        <input type="number" class="form-input" id="maxApplications" placeholder="20" min="1" max="100" data-field="application_settings.max_applications_per_day">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Min Match Score</label>
+                        <input type="number" class="form-input" id="minMatchScore" placeholder="70" min="0" max="100" data-field="application_settings.min_match_score">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Parallel Workers</label>
+                        <input type="number" class="form-input" id="parallelWorkers" placeholder="3" min="1" max="20" data-field="application_settings.parallel_workers">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Base Resume Path</label>
+                        <input type="text" class="form-input" id="baseResumePath" placeholder="/path/to/resume.pdf" data-field="application_settings.base_resume_path">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Job Types</label>
+                        <div class="tag-input-container" data-tag-field="application_settings.job_types">
+                            <div class="tag-list" id="jobTypesTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="e.g. full-time, contract..." onkeydown="handleTagInput(event, 'jobTypesTags', 'application_settings.job_types')">
+                        </div>
+                    </div>
+                </div>
+                <div style="padding-top: 8px;">
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">Require Human Review</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="requireHumanReview" data-field="application_settings.require_human_review">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 8: NOTIFICATIONS ===== -->
+    <div class="section-card" data-section="notifications">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon notifications">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Notifications</div>
+                    <div class="section-desc">Alert channels and webhook configuration</div>
+                </div>
+            </div>
+            <div class="section-chevron">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label class="form-label">Notification Channels</label>
+                        <div class="tag-input-container" data-tag-field="notifications.channels">
+                            <div class="tag-list" id="notificationChannelsTags"></div>
+                            <input type="text" class="tag-input-field" placeholder="e.g. email, slack, discord..." onkeydown="handleTagInput(event, 'notificationChannelsTags', 'notifications.channels')">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Notification Email</label>
+                        <input type="email" class="form-input" id="notificationEmail" placeholder="alerts@example.com" data-field="notifications.email">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Slack Webhook URL</label>
+                        <input type="url" class="form-input" id="slackWebhook" placeholder="https://hooks.slack.com/services/..." data-field="notifications.slack_webhook_url">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label">Discord Webhook URL</label>
+                        <input type="url" class="form-input" id="discordWebhook" placeholder="https://discord.com/api/webhooks/..." data-field="notifications.discord_webhook_url">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+</div>
+
+<!-- SAVE BAR -->
+<div class="save-bar">
+    <div class="save-bar-inner">
+        <div class="unsaved-indicator" id="unsavedIndicator">
+            <div class="unsaved-dot"></div>
+            <span>Unsaved changes</span>
+        </div>
+        <button class="btn btn-primary btn-save" id="saveBtn" onclick="saveProfile()">Save Profile</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    'use strict';
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    let profileData = {};
+    let tagData = {};
+    let isDirty = false;
+    let tempTags = {}; // for add-form temporary tags (e.g. work history techs)
+
+    // Tag field mappings: tagListId -> path in profileData
+    const TAG_FIELDS = {
+        'targetTitlesTags': 'target_titles',
+        'specializationsTags': 'specializations',
+        'certificationsTags': 'certifications',
+        'preferredLocationsTags': 'job_preferences.preferred_locations',
+        'excludedLocationsTags': 'job_preferences.excluded_locations',
+        'companySizeTags': 'job_preferences.company_size_preference',
+        'preferredIndustriesTags': 'job_preferences.preferred_industries',
+        'excludedIndustriesTags': 'job_preferences.excluded_industries',
+        'excludedCompaniesTags': 'job_preferences.excluded_companies',
+        'jobTypesTags': 'application_settings.job_types',
+        'notificationChannelsTags': 'notifications.channels'
+    };
+
+    // ============================================================
+    // DIRTY STATE
+    // ============================================================
+    function markDirty() {
+        if (!isDirty) {
+            isDirty = true;
+            document.getElementById('unsavedIndicator').classList.add('visible');
+        }
+    }
+
+    function markClean() {
+        isDirty = false;
+        document.getElementById('unsavedIndicator').classList.remove('visible');
+    }
+
+    // ============================================================
+    // SECTION COLLAPSE
+    // ============================================================
+    function toggleSection(header) {
+        const card = header.closest('.section-card');
+        const sectionId = card.dataset.section;
+        card.classList.toggle('collapsed');
+
+        // Persist state
+        const collapsed = JSON.parse(localStorage.getItem('bc_collapsed_sections') || '{}');
+        collapsed[sectionId] = card.classList.contains('collapsed');
+        localStorage.setItem('bc_collapsed_sections', JSON.stringify(collapsed));
+    }
+    window.toggleSection = toggleSection;
+
+    function restoreCollapseStates() {
+        const collapsed = JSON.parse(localStorage.getItem('bc_collapsed_sections') || '{}');
+        Object.entries(collapsed).forEach(([sectionId, isCollapsed]) => {
+            if (isCollapsed) {
+                const card = document.querySelector(`.section-card[data-section="${sectionId}"]`);
+                if (card) card.classList.add('collapsed');
+            }
+        });
+    }
+
+    // ============================================================
+    // TAG INPUT MANAGEMENT
+    // ============================================================
+    function getTagArray(fieldPath) {
+        if (!tagData[fieldPath]) tagData[fieldPath] = [];
+        return tagData[fieldPath];
+    }
+
+    function renderTags(tagListId, fieldPath) {
+        const container = document.getElementById(tagListId);
+        if (!container) return;
+        const arr = getTagArray(fieldPath);
+        container.innerHTML = '';
+        arr.forEach((val, idx) => {
+            const pill = document.createElement('span');
+            pill.className = 'tag-pill';
+            pill.innerHTML = `<span>${BC.esc(val)}</span><button class="tag-remove" onclick="removeTag('${tagListId}', '${fieldPath}', ${idx})">&times;</button>`;
+            container.appendChild(pill);
+        });
+    }
+
+    function handleTagInput(event, tagListId, fieldPath) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const input = event.target;
+            const val = input.value.trim();
+            if (!val) return;
+
+            const arr = getTagArray(fieldPath);
+            if (!arr.includes(val)) {
+                arr.push(val);
+                renderTags(tagListId, fieldPath);
+                markDirty();
+            }
+            input.value = '';
+        }
+    }
+    window.handleTagInput = handleTagInput;
+
+    function removeTag(tagListId, fieldPath, index) {
+        const arr = getTagArray(fieldPath);
+        // Animate removal
+        const container = document.getElementById(tagListId);
+        const pill = container.children[index];
+        if (pill) {
+            pill.classList.add('removing');
+            setTimeout(() => {
+                arr.splice(index, 1);
+                renderTags(tagListId, fieldPath);
+                markDirty();
+            }, 150);
+        } else {
+            arr.splice(index, 1);
+            renderTags(tagListId, fieldPath);
+            markDirty();
+        }
+    }
+    window.removeTag = removeTag;
+
+    // Temp tags for add forms (work history technologies)
+    function handleTempTagInput(event, tagListId) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const input = event.target;
+            const val = input.value.trim();
+            if (!val) return;
+            if (!tempTags[tagListId]) tempTags[tagListId] = [];
+            if (!tempTags[tagListId].includes(val)) {
+                tempTags[tagListId].push(val);
+                renderTempTags(tagListId);
+            }
+            input.value = '';
+        }
+    }
+    window.handleTempTagInput = handleTempTagInput;
+
+    function renderTempTags(tagListId) {
+        const container = document.getElementById(tagListId);
+        if (!container) return;
+        const arr = tempTags[tagListId] || [];
+        container.innerHTML = '';
+        arr.forEach((val, idx) => {
+            const pill = document.createElement('span');
+            pill.className = 'tag-pill';
+            pill.innerHTML = `<span>${BC.esc(val)}</span><button class="tag-remove" onclick="removeTempTag('${tagListId}', ${idx})">&times;</button>`;
+            container.appendChild(pill);
+        });
+    }
+
+    function removeTempTag(tagListId, index) {
+        if (!tempTags[tagListId]) return;
+        const container = document.getElementById(tagListId);
+        const pill = container.children[index];
+        if (pill) {
+            pill.classList.add('removing');
+            setTimeout(() => {
+                tempTags[tagListId].splice(index, 1);
+                renderTempTags(tagListId);
+            }, 150);
+        }
+    }
+    window.removeTempTag = removeTempTag;
+
+    // ============================================================
+    // ADD FORM TOGGLE
+    // ============================================================
+    function toggleAddForm(panelId) {
+        const panel = document.getElementById(panelId);
+        panel.classList.toggle('open');
+    }
+    window.toggleAddForm = toggleAddForm;
+
+    // ============================================================
+    // SKILLS
+    // ============================================================
+    function renderSkills() {
+        const tbody = document.getElementById('skillsTableBody');
+        const skills = profileData.skills || [];
+        if (skills.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px;font-size:0.8125rem;">No skills added yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = skills.map((skill, i) => `
+            <tr>
+                <td style="color:var(--text-primary);font-weight:500;">${BC.esc(skill.name || '')}</td>
+                <td><span style="text-transform:capitalize;">${BC.esc(skill.level || 'intermediate')}</span></td>
+                <td class="num">${skill.years != null ? skill.years : '-'}</td>
+                <td class="cell-actions">
+                    <button class="btn btn-danger btn-icon" onclick="removeSkill('${BC.esc(skill.name)}')" title="Remove">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function addSkill() {
+        const name = document.getElementById('newSkillName').value.trim();
+        const level = document.getElementById('newSkillLevel').value;
+        const years = parseInt(document.getElementById('newSkillYears').value) || 0;
+        if (!name) { window.showToast('Skill name is required', 'error'); return; }
+
+        try {
+            const res = await fetch('/api/profile/skills', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, level, years })
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            if (!profileData.skills) profileData.skills = [];
+            profileData.skills.push({ name, level, years });
+            renderSkills();
+            document.getElementById('newSkillName').value = '';
+            document.getElementById('newSkillYears').value = '';
+            window.showToast('Skill added', 'success');
+        } catch (e) {
+            window.showToast('Failed to add skill: ' + e.message, 'error');
+        }
+    }
+    window.addSkill = addSkill;
+
+    async function removeSkill(name) {
+        try {
+            const res = await fetch(`/api/profile/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(await res.text());
+
+            profileData.skills = (profileData.skills || []).filter(s => s.name !== name);
+            renderSkills();
+            window.showToast('Skill removed', 'success');
+        } catch (e) {
+            window.showToast('Failed to remove skill: ' + e.message, 'error');
+        }
+    }
+    window.removeSkill = removeSkill;
+
+    // ============================================================
+    // WORK HISTORY
+    // ============================================================
+    function renderWorkHistory() {
+        const container = document.getElementById('workHistoryList');
+        const history = profileData.work_history || [];
+        if (history.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:24px 0;font-size:0.8125rem;">No work history added yet</div>';
+            return;
+        }
+        container.innerHTML = history.map((entry, i) => `
+            <div class="work-entry">
+                <div class="work-entry-header">
+                    <div>
+                        <div class="work-entry-title">${BC.esc(entry.title || '')}</div>
+                        <div class="work-entry-company">${BC.esc(entry.company || '')}</div>
+                        <div class="work-entry-dates">${BC.esc(entry.start_date || '')} &mdash; ${BC.esc(entry.end_date || 'Present')}</div>
+                    </div>
+                    <button class="btn btn-danger btn-icon" onclick="removeWorkHistory(${i})" title="Remove">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                ${entry.description ? `<div class="work-entry-desc">${BC.esc(entry.description)}</div>` : ''}
+                ${(entry.technologies && entry.technologies.length) ? `
+                    <div class="work-entry-techs">
+                        ${entry.technologies.map(t => `<span class="tech-tag">${BC.esc(t)}</span>`).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+    }
+
+    async function addWorkHistory() {
+        const company = document.getElementById('newWorkCompany').value.trim();
+        const title = document.getElementById('newWorkTitle').value.trim();
+        const start_date = document.getElementById('newWorkStart').value.trim();
+        const end_date = document.getElementById('newWorkEnd').value.trim();
+        const description = document.getElementById('newWorkDesc').value.trim();
+        const technologies = tempTags['newWorkTechsTags'] ? [...tempTags['newWorkTechsTags']] : [];
+
+        if (!company || !title) { window.showToast('Company and title are required', 'error'); return; }
+
+        const entry = { company, title, start_date, end_date, description, technologies };
+
+        try {
+            const res = await fetch('/api/profile/work-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(entry)
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            if (!profileData.work_history) profileData.work_history = [];
+            profileData.work_history.push(entry);
+            renderWorkHistory();
+
+            // Reset form
+            document.getElementById('newWorkCompany').value = '';
+            document.getElementById('newWorkTitle').value = '';
+            document.getElementById('newWorkStart').value = '';
+            document.getElementById('newWorkEnd').value = '';
+            document.getElementById('newWorkDesc').value = '';
+            tempTags['newWorkTechsTags'] = [];
+            renderTempTags('newWorkTechsTags');
+            toggleAddForm('workAddPanel');
+            window.showToast('Work experience added', 'success');
+        } catch (e) {
+            window.showToast('Failed to add work history: ' + e.message, 'error');
+        }
+    }
+    window.addWorkHistory = addWorkHistory;
+
+    async function removeWorkHistory(index) {
+        try {
+            const res = await fetch(`/api/profile/work-history/${index}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(await res.text());
+
+            profileData.work_history.splice(index, 1);
+            renderWorkHistory();
+            window.showToast('Work experience removed', 'success');
+        } catch (e) {
+            window.showToast('Failed to remove work history: ' + e.message, 'error');
+        }
+    }
+    window.removeWorkHistory = removeWorkHistory;
+
+    // ============================================================
+    // EDUCATION
+    // ============================================================
+    function renderEducation() {
+        const tbody = document.getElementById('educationTableBody');
+        const edu = profileData.education || [];
+        if (edu.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:24px;font-size:0.8125rem;">No education added yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = edu.map((entry, i) => `
+            <tr>
+                <td style="color:var(--text-primary);font-weight:500;">${BC.esc(entry.degree || '')}</td>
+                <td>${BC.esc(entry.institution || '')}</td>
+                <td class="num">${entry.year || '-'}</td>
+                <td class="num">${entry.gpa || '-'}</td>
+                <td class="cell-actions">
+                    <button class="btn btn-danger btn-icon" onclick="removeEducation(${i})" title="Remove">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function addEducation() {
+        const degree = document.getElementById('newEduDegree').value.trim();
+        const institution = document.getElementById('newEduInstitution').value.trim();
+        const year = parseInt(document.getElementById('newEduYear').value) || null;
+        const gpa = document.getElementById('newEduGpa').value.trim() || null;
+
+        if (!degree || !institution) { window.showToast('Degree and institution are required', 'error'); return; }
+
+        const entry = { degree, institution, year, gpa };
+
+        try {
+            const res = await fetch('/api/profile/education', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(entry)
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            if (!profileData.education) profileData.education = [];
+            profileData.education.push(entry);
+            renderEducation();
+
+            document.getElementById('newEduDegree').value = '';
+            document.getElementById('newEduInstitution').value = '';
+            document.getElementById('newEduYear').value = '';
+            document.getElementById('newEduGpa').value = '';
+            window.showToast('Education added', 'success');
+        } catch (e) {
+            window.showToast('Failed to add education: ' + e.message, 'error');
+        }
+    }
+    window.addEducation = addEducation;
+
+    async function removeEducation(index) {
+        try {
+            const res = await fetch(`/api/profile/education/${index}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(await res.text());
+
+            profileData.education.splice(index, 1);
+            renderEducation();
+            window.showToast('Education removed', 'success');
+        } catch (e) {
+            window.showToast('Failed to remove education: ' + e.message, 'error');
+        }
+    }
+    window.removeEducation = removeEducation;
+
+    // ============================================================
+    // POPULATE FORM FROM PROFILE DATA
+    // ============================================================
+    function populateForm(data) {
+        profileData = data || {};
+
+        // Simple inputs and selects via data-field
+        document.querySelectorAll('[data-field]').forEach(el => {
+            const val = BC.getNestedValue(profileData, el.dataset.field);
+            if (val === undefined || val === null) return;
+            if (el.type === 'checkbox') {
+                el.checked = !!val;
+            } else {
+                el.value = val;
+            }
+        });
+
+        // Tag fields
+        Object.entries(TAG_FIELDS).forEach(([tagListId, fieldPath]) => {
+            const arr = BC.getNestedValue(profileData, fieldPath);
+            tagData[fieldPath] = Array.isArray(arr) ? [...arr] : [];
+            renderTags(tagListId, fieldPath);
+        });
+
+        // Complex sections
+        renderSkills();
+        renderWorkHistory();
+        renderEducation();
+    }
+
+    // ============================================================
+    // COLLECT FORM DATA
+    // ============================================================
+    function collectFormData() {
+        const data = JSON.parse(JSON.stringify(profileData));
+
+        // Simple inputs via data-field
+        document.querySelectorAll('[data-field]').forEach(el => {
+            let val;
+            if (el.type === 'checkbox') {
+                val = el.checked;
+            } else if (el.type === 'number') {
+                val = el.value ? Number(el.value) : null;
+            } else {
+                val = el.value || null;
+            }
+            BC.setNestedValue(data, el.dataset.field, val);
+        });
+
+        // Tag fields
+        Object.entries(TAG_FIELDS).forEach(([tagListId, fieldPath]) => {
+            BC.setNestedValue(data, fieldPath, [...(tagData[fieldPath] || [])]);
+        });
+
+        return data;
+    }
+
+    // ============================================================
+    // SAVE PROFILE
+    // ============================================================
+    async function saveProfile() {
+        const btn = document.getElementById('saveBtn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Saving...';
+        btn.disabled = true;
+
+        try {
+            const data = collectFormData();
+            const res = await fetch('/api/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error(await res.text());
+
+            const result = await res.json();
+            profileData = result;
+            markClean();
+            window.showToast('Profile saved successfully', 'success');
+        } catch (e) {
+            window.showToast('Failed to save profile: ' + e.message, 'error');
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    }
+    window.saveProfile = saveProfile;
+
+    // ============================================================
+    // DIRTY STATE TRACKING
+    // ============================================================
+    function setupDirtyTracking() {
+        // Track changes on all form inputs
+        document.querySelectorAll('.form-input, .form-select, .form-textarea').forEach(el => {
+            el.addEventListener('input', markDirty);
+            el.addEventListener('change', markDirty);
+        });
+        // Toggle switches
+        document.querySelectorAll('.toggle-switch input').forEach(el => {
+            el.addEventListener('change', markDirty);
+        });
+    }
+
+    // ============================================================
+    // LOAD PROFILE
+    // ============================================================
+    async function loadProfile() {
+        try {
+            const res = await fetch('/api/profile');
+            if (!res.ok) throw new Error('Failed to load profile');
+            const data = await res.json();
+            populateForm(data);
+        } catch (e) {
+            console.error('Error loading profile:', e);
+            // Initialize with empty defaults
+            populateForm({});
+            window.showToast('Could not load profile data', 'error');
+        }
+    }
+
+    // ============================================================
+    // KEYBOARD SHORTCUTS
+    // ============================================================
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + S to save
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (isDirty) saveProfile();
+        }
+    });
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    restoreCollapseStates();
+    setupDirtyTracking();
+    loadProfile();
+
+})();
+</script>
+{% endblock %}

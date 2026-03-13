@@ -1,0 +1,36 @@
+full_name: Your Name
+email: your.email@example.com
+phone: +1-555-000-0000
+location: Remote
+years_of_experience: 5
+current_title: Software Engineer
+target_titles:
+- Senior Software Engineer
+- Staff Engineer
+- Tech Lead
+skills: []
+specializations:
+- backend
+- fullstack
+education: []
+certifications: []
+work_history: []
+salary_currency: USD
+remote_preference: remote_only
+locations_preferred:
+- Remote
+locations_excluded: []
+company_size_preference: []
+industries_preferred: []
+industries_excluded: []
+companies_excluded: []
+visa_sponsorship_needed: false
+willing_to_relocate: false
+max_applications_per_day: 20
+min_match_score: 70
+require_human_review: false
+job_types:
+- full-time
+parallel_workers: 5
+notification_channels:
+- email

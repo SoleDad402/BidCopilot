@@ -1,0 +1,72 @@
+/* ================================================================
+   DESIGN TOKENS — BidCopilot Design System
+   Single source of truth for all visual properties.
+   ================================================================ */
+
+:root {
+    /* ── Backgrounds ── */
+    --bg-root: #0a0e1a;
+    --bg-primary: #111827;
+    --bg-elevated: #1a2035;
+    --bg-card: rgba(26, 32, 53, 0.65);
+    --bg-card-solid: #1a2035;
+    --bg-card-hover: rgba(30, 38, 62, 0.8);
+    --bg-input: rgba(30, 38, 62, 0.9);
+    --bg-input-focus: rgba(38, 48, 78, 0.95);
+
+    /* ── Brand ── */
+    --accent: #e94560;
+    --accent-hover: #f2596f;
+    --accent-subtle: rgba(233, 69, 96, 0.12);
+
+    /* ── Semantic colors ── */
+    --blue: #3b82f6;
+    --blue-hover: #4f8ff7;
+    --blue-subtle: rgba(59, 130, 246, 0.12);
+    --success: #34d399;
+    --success-subtle: rgba(52, 211, 153, 0.12);
+    --warning: #fbbf24;
+    --warning-subtle: rgba(251, 191, 36, 0.12);
+    --error: #f87171;
+    --error-subtle: rgba(248, 113, 113, 0.12);
+    --purple: #8b5cf6;
+    --purple-subtle: rgba(139, 92, 246, 0.15);
+    --cyan: #06b6d4;
+    --cyan-subtle: rgba(6, 182, 212, 0.15);
+    --orange: #f97316;
+    --orange-subtle: rgba(249, 115, 22, 0.15);
+    --violet: #a855f7;
+    --violet-subtle: rgba(168, 85, 247, 0.15);
+
+    /* ── Text ── */
+    --text-primary: #f0f2f5;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-dim: #475569;
+
+    /* ── Borders ── */
+    --border: rgba(255, 255, 255, 0.04);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-accent: rgba(233, 69, 96, 0.3);
+    --border-focus: rgba(59, 130, 246, 0.5);
+
+    /* ── Radius ── */
+    --radius-sm: 6px;
+    --radius: 8px;
+    --radius-lg: 12px;
+
+    /* ── Shadows ── */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+    /* ── Glass / blur ── */
+    --blur: blur(16px);
+    --blur-heavy: blur(24px);
+    --glass-bg: rgba(10, 14, 26, 0.82);
+    --glass-border: rgba(255, 255, 255, 0.08);
+
+    /* ── Transitions ── */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+}

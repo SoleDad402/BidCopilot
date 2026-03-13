@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BidCopilot Command Center{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Design System -->
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="page-enter">
+
+<!-- HEADER -->
+<header class="header">
+    <div class="header-left">
+        <a href="/" class="header-brand">
+            <div class="logo-mark">BC</div>
+            <span class="header-title">BidCopilot Command Center</span>
+        </a>
+        <nav class="header-nav">
+            <a href="/" {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+            <a href="/profile" {% if active_page == 'profile' %}class="active"{% endif %}>Profile</a>
+        </nav>
+    </div>
+    <div class="header-right">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="lastUpdate">{% block status_text %}System Online{% endblock %}</span>
+        </div>
+    </div>
+</header>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toasts"></div>
+
+{% block body %}{% endblock %}
+
+<!-- Shared Utilities -->
+<script src="/static/js/utils.js"></script>
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

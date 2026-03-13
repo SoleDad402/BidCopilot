@@ -1,0 +1,740 @@
+{% extends "base.html" %}
+
+{% block title %}BidCopilot Command Center{% endblock %}
+
+{% block status_text %}Connecting...{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* ================================================================
+       LAYOUT
+       ================================================================ */
+    .container {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 24px 32px 48px;
+    }
+
+    /* ================================================================
+       STATS ROW
+       ================================================================ */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .stat-card {
+        background: var(--bg-card);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 20px 22px 18px;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    }
+    .stat-card:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--border-subtle);
+    }
+    .stat-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-dim);
+        margin-bottom: 10px;
+    }
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+        margin-bottom: 6px;
+    }
+    .stat-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+    }
+    .stat-trend.up { color: var(--success); }
+    .stat-trend.down { color: var(--error); }
+    .stat-trend.neutral { color: var(--text-dim); }
+    .stat-sub {
+        font-size: 0.6875rem;
+        color: var(--text-dim);
+        margin-top: 2px;
+    }
+    .stat-card[data-accent="blue"] .stat-value { color: var(--blue); }
+    .stat-card[data-accent="warning"] .stat-value { color: var(--warning); }
+    .stat-card[data-accent="success"] .stat-value { color: var(--success); }
+    .stat-card[data-accent="accent"] .stat-value { color: var(--accent); }
+    .stat-card[data-accent="error"] .stat-value { color: var(--error); }
+
+    /* ================================================================
+       PIPELINE CONTROL
+       ================================================================ */
+    .pipeline-strip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        background: var(--bg-card);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        margin-bottom: 20px;
+    }
+    .pipeline-strip-title {
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-dim);
+        margin-right: 8px;
+        white-space: nowrap;
+    }
+    .pipeline-divider {
+        width: 1px;
+        height: 28px;
+        background: var(--border-subtle);
+        margin: 0 4px;
+    }
+    .pipeline-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .pipeline-meta {
+        font-size: 0.6875rem;
+        color: var(--text-dim);
+    }
+    .pipeline-meta strong {
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+    .pipeline-spacer { flex: 1; }
+    .pipeline-lastrun {
+        font-size: 0.6875rem;
+        color: var(--text-dim);
+        white-space: nowrap;
+    }
+
+    /* ================================================================
+       MAIN TWO-COLUMN LAYOUT
+       ================================================================ */
+    .main-grid {
+        display: grid;
+        grid-template-columns: 65fr 35fr;
+        gap: 16px;
+    }
+
+    /* ================================================================
+       JOB ROW ELEMENTS
+       ================================================================ */
+    .job-link {
+        color: var(--text-primary);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.8125rem;
+        transition: color 0.15s ease;
+    }
+    .job-link:hover { color: var(--accent); }
+    .job-subtitle {
+        color: var(--text-dim);
+        font-size: 0.6875rem;
+        margin-top: 1px;
+    }
+    .job-tags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; }
+    .skill-tag {
+        display: inline-block;
+        padding: 1px 6px;
+        font-size: 0.6rem;
+        font-weight: 500;
+        background: var(--blue-subtle);
+        color: var(--blue);
+        border-radius: 4px;
+    }
+    .red-flag {
+        display: inline-block;
+        padding: 1px 6px;
+        font-size: 0.6rem;
+        font-weight: 500;
+        background: var(--error-subtle);
+        color: var(--error);
+        border-radius: 4px;
+    }
+
+    /* ================================================================
+       QUEUE CARD ITEMS
+       ================================================================ */
+    .queue-item {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s ease;
+    }
+    .queue-item:last-child { border-bottom: none; }
+    .queue-item:hover { background: rgba(255,255,255,0.01); }
+    .queue-item-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .queue-item-info { flex: 1; min-width: 0; }
+    .queue-item-title {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        text-decoration: none;
+        display: block;
+        transition: color 0.15s ease;
+    }
+    .queue-item-title:hover { color: var(--accent); }
+    .queue-item-company {
+        font-size: 0.6875rem;
+        color: var(--text-dim);
+        margin-top: 1px;
+    }
+    .queue-item-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    .queue-item-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        margin-top: 6px;
+    }
+
+    /* ================================================================
+       ACTIVITY TIMELINE
+       ================================================================ */
+    .timeline { padding: 16px 20px; }
+    .timeline-item {
+        display: flex;
+        gap: 12px;
+        padding: 8px 0;
+        position: relative;
+    }
+    .timeline-item:not(:last-child)::before {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 24px;
+        bottom: -8px;
+        width: 1px;
+        background: var(--border-subtle);
+    }
+    .timeline-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        border: 2px solid var(--bg-elevated);
+        background: var(--text-dim);
+        flex-shrink: 0;
+        margin-top: 4px;
+        position: relative;
+        z-index: 1;
+    }
+    .timeline-dot.success { background: var(--success); border-color: var(--success-subtle); }
+    .timeline-dot.error { background: var(--error); border-color: var(--error-subtle); }
+    .timeline-dot.info { background: var(--blue); border-color: var(--blue-subtle); }
+    .timeline-dot.warning { background: var(--warning); border-color: var(--warning-subtle); }
+    .timeline-content { flex: 1; min-width: 0; }
+    .timeline-text {
+        font-size: 0.8125rem;
+        color: var(--text-secondary);
+        line-height: 1.4;
+    }
+    .timeline-text strong { color: var(--text-primary); font-weight: 500; }
+    .timeline-time {
+        font-size: 0.625rem;
+        color: var(--text-dim);
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ================================================================
+       RESPONSIVE
+       ================================================================ */
+    @media (max-width: 1024px) {
+        .main-grid { grid-template-columns: 1fr; }
+        .stats-row { grid-template-columns: repeat(3, 1fr); }
+        .container { padding: 16px; }
+    }
+    @media (max-width: 768px) {
+        .stats-row { grid-template-columns: repeat(2, 1fr); }
+        .pipeline-strip { flex-wrap: wrap; }
+    }
+    @media (max-width: 480px) {
+        .stats-row { grid-template-columns: 1fr; }
+        .stat-value { font-size: 2rem; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<!-- ================================================================
+     MAIN CONTENT
+     ================================================================ -->
+<div class="container">
+
+    <!-- STATS ROW -->
+    <div class="stats-row" id="statsGrid">
+        <div class="stat-card" data-accent="blue">
+            <div class="stat-label">Total Jobs</div>
+            <div class="stat-value tabnum" id="statTotal" data-value="0">--</div>
+            <div class="stat-sub" id="statNew">-- new</div>
+        </div>
+        <div class="stat-card" data-accent="warning">
+            <div class="stat-label">Matched</div>
+            <div class="stat-value tabnum" id="statMatched" data-value="0">--</div>
+            <div class="stat-sub">ready to review</div>
+        </div>
+        <div class="stat-card" data-accent="success">
+            <div class="stat-label">Applied Today</div>
+            <div class="stat-value tabnum" id="statApplied" data-value="0">--</div>
+            <div class="stat-sub" id="statAppliedTotal">-- total applied</div>
+        </div>
+        <div class="stat-card" data-accent="accent">
+            <div class="stat-label">Sources</div>
+            <div class="stat-value tabnum" id="statSources" data-value="0">--</div>
+            <div class="stat-sub">active career pages</div>
+        </div>
+        <div class="stat-card" data-accent="error">
+            <div class="stat-label">Errors</div>
+            <div class="stat-value tabnum" id="statErrors" data-value="0">--</div>
+            <div class="stat-sub">need attention</div>
+        </div>
+    </div>
+
+    <!-- PIPELINE STRIP -->
+    <div class="pipeline-strip">
+        <span class="pipeline-strip-title">Pipeline</span>
+        <div class="pipeline-divider"></div>
+        <div class="pipeline-item">
+            <button class="btn btn-primary" id="btnDiscover" onclick="triggerPipeline('discover')">Run Discovery</button>
+            <span class="badge badge-idle" id="pipeDiscoveryBadge">Idle</span>
+        </div>
+        <div class="pipeline-divider"></div>
+        <div class="pipeline-item">
+            <button class="btn btn-blue" id="btnMatch" onclick="triggerPipeline('match')">Run Matching</button>
+            <span class="badge badge-idle" id="pipeMatchBadge">Idle</span>
+        </div>
+        <div class="pipeline-spacer"></div>
+        <span class="pipeline-lastrun" id="lastDiscovery"></span>
+    </div>
+
+    <!-- TWO-COLUMN LAYOUT -->
+    <div class="main-grid">
+
+        <!-- LEFT COLUMN -->
+        <div class="left-col">
+
+            <!-- JOBS TABLE -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Jobs</h3>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" class="filter-input" id="jobSearch" placeholder="Search by title, company, or location..." oninput="debounceJobSearch()">
+                    <select class="filter-select" id="jobStatusFilter" onchange="loadJobs(1)">
+                        <option value="">All Status</option>
+                        <option value="new">New</option>
+                        <option value="matched">Matched</option>
+                        <option value="applied">Applied</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="error">Error</option>
+                    </select>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:40%">Job</th>
+                                <th>Source</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobsBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="jobsPagination" style="display:none"></div>
+            </div>
+
+            <!-- SOURCE EXPLORER -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Source Explorer</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Region</th>
+                                <th>ATS</th>
+                                <th class="tabnum">Jobs</th>
+                                <th class="tabnum">Remote</th>
+                                <th>Last Crawled</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sourcesBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="right-col">
+
+            <!-- APPLICATION QUEUE -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Application Queue</h3>
+                    <span class="badge badge-count" id="queueCount">0</span>
+                </div>
+                <div id="queueBody"></div>
+                <div class="pagination" id="queuePagination" style="display:none"></div>
+            </div>
+
+            <!-- RECENT ACTIVITY -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Activity</h3>
+                </div>
+                <div id="activityBody"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    'use strict';
+
+    // Aliases for shared utilities
+    var esc = BC.esc;
+    var capitalize = BC.capitalize;
+    var timeAgo = BC.timeAgo;
+    var showToast = BC.showToast;
+    var api = BC.api;
+    var animateValue = BC.animateValue;
+    var tableSkeletonRows = BC.tableSkeletonRows;
+    var queueSkeletonCards = BC.queueSkeletonCards;
+    var activitySkeletonItems = BC.activitySkeletonItems;
+    var showPagination = BC.showPagination;
+    var hidePagination = BC.hidePagination;
+
+    // ----------------------------------------------------------------
+    // STATE
+    // ----------------------------------------------------------------
+    var jobPage = 1;
+    var queuePage = 1;
+    var searchTimeout = null;
+
+    // Show initial skeletons
+    document.getElementById('jobsBody').innerHTML = tableSkeletonRows(6, 8);
+    document.getElementById('sourcesBody').innerHTML = tableSkeletonRows(7, 4);
+    document.getElementById('queueBody').innerHTML = queueSkeletonCards(4);
+    document.getElementById('activityBody').innerHTML = activitySkeletonItems(5);
+
+    // ----------------------------------------------------------------
+    // LOAD STATS
+    // ----------------------------------------------------------------
+    function loadStats() {
+        api('/api/stats').then(function(d) {
+            animateValue(document.getElementById('statTotal'), d.jobs.total);
+            document.getElementById('statNew').textContent = d.jobs.new + ' new';
+            animateValue(document.getElementById('statMatched'), d.jobs.matched);
+            animateValue(document.getElementById('statApplied'), d.today_applications);
+            document.getElementById('statAppliedTotal').textContent = d.jobs.applied + ' total applied';
+            animateValue(document.getElementById('statSources'), d.sources);
+            animateValue(document.getElementById('statErrors'), d.jobs.errors);
+
+            // Pipeline status badges
+            var ds = d.pipeline.discovery || {};
+            var ms = d.pipeline.matching || {};
+            var dBadge = document.getElementById('pipeDiscoveryBadge');
+            var mBadge = document.getElementById('pipeMatchBadge');
+            var dStatus = ds.status || 'idle';
+            var mStatus = ms.status || 'idle';
+            dBadge.textContent = capitalize(dStatus);
+            dBadge.className = 'badge badge-' + (dStatus === 'running' ? 'running' : 'idle');
+            mBadge.textContent = capitalize(mStatus);
+            mBadge.className = 'badge badge-' + (mStatus === 'running' ? 'running' : 'idle');
+
+            // Last discovery info
+            if (d.last_discovery && d.last_discovery.time) {
+                document.getElementById('lastDiscovery').textContent =
+                    'Last: ' + d.last_discovery.site + ' \u00b7 ' + timeAgo(d.last_discovery.time) +
+                    ' \u00b7 ' + d.last_discovery.found + ' found';
+            }
+
+            document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        }).catch(function() {});
+    }
+
+    // ----------------------------------------------------------------
+    // LOAD JOBS
+    // ----------------------------------------------------------------
+    window.loadJobs = function(page) {
+        page = page || 1;
+        jobPage = page;
+        var search = document.getElementById('jobSearch').value;
+        var status = document.getElementById('jobStatusFilter').value;
+        var params = new URLSearchParams({page: page, limit: 20});
+        if (search) params.set('search', search);
+        if (status) params.set('status', status);
+
+        var body = document.getElementById('jobsBody');
+        body.innerHTML = tableSkeletonRows(6, 6);
+
+        api('/api/jobs?' + params).then(function(d) {
+            if (!d.jobs || !d.jobs.length) {
+                body.innerHTML = '<tr><td colspan="6"><div class="empty-state">No jobs found</div></td></tr>';
+                hidePagination('jobsPagination');
+                return;
+            }
+            body.innerHTML = d.jobs.map(function(j) {
+                var sc = j.match_score;
+                var scoreClass = sc != null ? ((sc >= 80) ? 'score-high' : (sc >= 50 ? 'score-mid' : 'score-low')) : '';
+                var skills = (j.required_skills || []).slice(0, 4).map(function(s) {
+                    return '<span class="skill-tag">' + esc(s) + '</span>';
+                }).join('');
+                var flags = (j.red_flags || []).map(function(f) {
+                    return '<span class="red-flag">' + esc(f) + '</span>';
+                }).join('');
+                var tags = '';
+                if (skills || flags) {
+                    tags = '<div class="job-tags">' + skills + flags + '</div>';
+                }
+
+                return '<tr>' +
+                    '<td><div class="truncate">' +
+                    '<a class="job-link" href="' + esc(j.url || '#') + '" target="_blank" rel="noopener">' + esc(j.title) + '</a>' +
+                    '<div class="job-subtitle">' + esc(j.company || '') + (j.location ? ' \u00b7 ' + esc(j.location) : '') + '</div>' +
+                    tags +
+                    '</div></td>' +
+                    '<td><span style="font-size:0.75rem;color:var(--text-secondary)">' + esc(j.site_name || '-') + '</span></td>' +
+                    '<td>' + (sc != null ? '<span class="score ' + scoreClass + '">' + sc + '</span>' : '<span style="color:var(--text-dim)">--</span>') + '</td>' +
+                    '<td><span class="badge badge-' + (j.status || 'new') + '">' + esc(j.status || 'new') + '</span></td>' +
+                    '<td><span class="tabnum" style="font-size:0.6875rem;color:var(--text-dim);white-space:nowrap">' + (j.discovered_at ? timeAgo(j.discovered_at) : '--') + '</span></td>' +
+                    '<td><select class="action-select" onchange="updateJobStatus(' + j.id + ', this.value)">' +
+                    '<option value="">Change...</option>' +
+                    '<option value="new">New</option>' +
+                    '<option value="matched">Matched</option>' +
+                    '<option value="applied">Applied</option>' +
+                    '<option value="rejected">Rejected</option>' +
+                    '</select></td>' +
+                    '</tr>';
+            }).join('');
+
+            showPagination('jobsPagination', d.page, d.pages, function(p) { loadJobs(p); });
+        }).catch(function() {
+            body.innerHTML = '<tr><td colspan="6"><div class="empty-state">Failed to load jobs</div></td></tr>';
+        });
+    };
+
+    // ----------------------------------------------------------------
+    // UPDATE JOB STATUS
+    // ----------------------------------------------------------------
+    window.updateJobStatus = function(id, status) {
+        if (!status) return;
+        api('/api/jobs/' + id + '/status', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: status})
+        }).then(function() {
+            showToast('Job status updated to ' + status, 'success');
+            loadJobs(jobPage);
+            loadStats();
+            loadQueue(queuePage);
+        }).catch(function() {});
+    };
+
+    // ----------------------------------------------------------------
+    // SEARCH DEBOUNCE
+    // ----------------------------------------------------------------
+    window.debounceJobSearch = function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() { loadJobs(1); }, 400);
+    };
+
+    // ----------------------------------------------------------------
+    // LOAD QUEUE
+    // ----------------------------------------------------------------
+    window.loadQueue = function(page) {
+        page = page || 1;
+        queuePage = page;
+        var container = document.getElementById('queueBody');
+        container.innerHTML = queueSkeletonCards(3);
+
+        api('/api/queue?page=' + page + '&limit=20').then(function(d) {
+            document.getElementById('queueCount').textContent = d.total || 0;
+            if (!d.queue || !d.queue.length) {
+                container.innerHTML = '<div class="empty-state">No jobs in queue</div>';
+                hidePagination('queuePagination');
+                return;
+            }
+            container.innerHTML = d.queue.map(function(j) {
+                var sc = j.match_score;
+                var scoreClass = sc != null ? ((sc >= 80) ? 'score-high' : (sc >= 50 ? 'score-mid' : 'score-low')) : '';
+                var skills = (j.required_skills || []).slice(0, 3).map(function(s) {
+                    return '<span class="skill-tag">' + esc(s) + '</span>';
+                }).join('');
+                var flags = (j.red_flags || []).map(function(f) {
+                    return '<span class="red-flag">' + esc(f) + '</span>';
+                }).join('');
+                var tags = '';
+                if (skills || flags) {
+                    tags = '<div class="queue-item-tags">' + skills + flags + '</div>';
+                }
+
+                return '<div class="queue-item">' +
+                    '<div class="queue-item-top">' +
+                    '<div class="queue-item-info">' +
+                    '<a class="queue-item-title" href="' + esc(j.url || '#') + '" target="_blank" rel="noopener">' + esc(j.title) + '</a>' +
+                    '<div class="queue-item-company">' + esc(j.company || '') + '</div>' +
+                    tags +
+                    '</div>' +
+                    '<div class="queue-item-actions">' +
+                    (sc != null ? '<span class="score ' + scoreClass + '">' + sc + '</span>' : '') +
+                    '<button class="btn btn-success btn-sm" onclick="updateJobStatus(' + j.id + ',\'applied\')">Approve</button>' +
+                    '<button class="btn btn-outline btn-sm" onclick="updateJobStatus(' + j.id + ',\'rejected\')">Skip</button>' +
+                    '</div></div></div>';
+            }).join('');
+
+            var totalPages = Math.ceil((d.total || 0) / 20);
+            showPagination('queuePagination', page, totalPages, function(p) { loadQueue(p); });
+        }).catch(function() {
+            container.innerHTML = '<div class="empty-state">Failed to load queue</div>';
+        });
+    };
+
+    // ----------------------------------------------------------------
+    // LOAD SOURCES
+    // ----------------------------------------------------------------
+    function loadSources() {
+        var body = document.getElementById('sourcesBody');
+        api('/api/sources').then(function(d) {
+            if (!d.sources || !d.sources.length) {
+                body.innerHTML = '<tr><td colspan="7"><div class="empty-state">No sources configured</div></td></tr>';
+                return;
+            }
+            body.innerHTML = d.sources.map(function(s) {
+                return '<tr>' +
+                    '<td><span style="font-weight:500">' + esc(s.company_name || '-') + '</span></td>' +
+                    '<td>' + (s.region ? '<span class="region-badge">' + esc(s.region) + '</span>' : '<span style="color:var(--text-dim)">--</span>') + '</td>' +
+                    '<td>' + (s.ats_type ? '<span class="ats-badge">' + esc(s.ats_type) + '</span>' : '<span style="color:var(--text-dim)">--</span>') + '</td>' +
+                    '<td class="tabnum" style="color:var(--text-secondary)">' + (s.total_jobs_found || 0) + '</td>' +
+                    '<td class="tabnum" style="color:var(--text-secondary)">' + (s.remote_jobs_found || 0) + '</td>' +
+                    '<td><span style="font-size:0.6875rem;color:var(--text-dim)">' + (s.last_crawled_at ? timeAgo(s.last_crawled_at) : 'Never') + '</span></td>' +
+                    '<td><span class="' + (s.is_enabled ? 'source-active' : 'source-disabled') + '">' + (s.is_enabled ? 'Active' : 'Disabled') + '</span></td>' +
+                    '</tr>';
+            }).join('');
+        }).catch(function() {
+            body.innerHTML = '<tr><td colspan="7"><div class="empty-state">Failed to load sources</div></td></tr>';
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // LOAD ACTIVITY
+    // ----------------------------------------------------------------
+    function loadActivity() {
+        var body = document.getElementById('activityBody');
+        api('/api/activity').then(function(d) {
+            if (!d.activity || !d.activity.length) {
+                body.innerHTML = '<div class="empty-state">No recent activity</div>';
+                return;
+            }
+            var html = '<div class="timeline">';
+            html += d.activity.map(function(a) {
+                var dotClass = 'info';
+                var s = (a.status || '').toLowerCase();
+                if (s === 'success' || s === 'completed') dotClass = 'success';
+                else if (s === 'error' || s === 'failed') dotClass = 'error';
+                else if (s === 'running') dotClass = 'warning';
+
+                return '<div class="timeline-item">' +
+                    '<div class="timeline-dot ' + dotClass + '"></div>' +
+                    '<div class="timeline-content">' +
+                    '<div class="timeline-text"><strong>' + esc(a.site || 'Discovery') + '</strong> ' +
+                    '<span class="badge badge-' + (a.status || 'idle') + '" style="margin-left:4px">' + esc(a.status || '') + '</span>' +
+                    '</div>' +
+                    '<div class="timeline-time">' + timeAgo(a.time) +
+                    ' \u00b7 ' + (a.jobs_found || 0) + ' found, ' + (a.jobs_new || 0) + ' new</div>' +
+                    '</div></div>';
+            }).join('');
+            html += '</div>';
+            body.innerHTML = html;
+        }).catch(function() {
+            body.innerHTML = '<div class="empty-state">Failed to load activity</div>';
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // TRIGGER PIPELINE
+    // ----------------------------------------------------------------
+    window.triggerPipeline = function(action) {
+        var btn = document.getElementById(action === 'discover' ? 'btnDiscover' : 'btnMatch');
+        var origText = btn.textContent;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Running...';
+        api('/api/pipeline/' + action, {method: 'POST'}).then(function(d) {
+            showToast(d.message || 'Pipeline triggered', 'success');
+            loadStats();
+            if (action === 'discover') {
+                loadSources();
+                loadActivity();
+            } else {
+                loadJobs(jobPage);
+                loadQueue(queuePage);
+            }
+        }).catch(function() {}).then(function() {
+            btn.disabled = false;
+            btn.textContent = origText;
+        });
+    };
+
+    // ----------------------------------------------------------------
+    // INIT & AUTO-REFRESH
+    // ----------------------------------------------------------------
+    function loadAll() {
+        loadStats();
+        loadJobs(jobPage);
+        loadQueue(queuePage);
+        loadSources();
+        loadActivity();
+    }
+
+    loadAll();
+    setInterval(loadAll, 30000);
+})();
+</script>
+{% endblock %}
