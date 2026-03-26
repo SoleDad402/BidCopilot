@@ -163,6 +163,10 @@ async def dashboard_page(request: Request):
 async def profile_page(request: Request):
     return templates.TemplateResponse("profile.html", _template_ctx(request, active_page="profile"))
 
+@app.get("/monitor", response_class=HTMLResponse)
+async def monitor_page(request: Request):
+    return templates.TemplateResponse("monitor.html", _template_ctx(request, active_page="monitor"))
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
     return templates.TemplateResponse("admin.html", _template_ctx(request, active_page="admin"))

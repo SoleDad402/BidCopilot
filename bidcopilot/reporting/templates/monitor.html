@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline Monitor - BidCopilot Command Center{% endblock %}
+
+{% block head_extra_inner %}
+    /* ═══════ LAYOUT ═══════ */
+    .monitor-container { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+    .monitor-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 2px; }
+    .monitor-subtitle { font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 28px; display: flex; align-items: center; gap: 10px; }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: livePulse 2s ease-in-out infinite; }
+    @keyframes livePulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52,211,153,0.5); } 50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(52,211,153,0); } }
+
+    /* ═══════ PIPELINE FLOW ═══════ */
+    .pipeline-flow { display: flex; align-items: stretch; gap: 0; margin-bottom: 28px; position: relative; }
+    .pipeline-stage { flex: 1; position: relative; }
+    .stage-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px 20px; text-align: center; position: relative; z-index: 1; transition: border-color 0.3s, box-shadow 0.3s; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .stage-card.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(233,69,96,0.15), inset 0 0 20px rgba(233,69,96,0.03); }
+    .stage-card.done { border-color: rgba(52,211,153,0.3); }
+    .stage-card.error { border-color: rgba(248,113,113,0.3); }
+
+    /* Arrow connector */
+    .pipeline-arrow { width: 48px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 0; }
+    .arrow-line { position: relative; width: 100%; height: 2px; background: var(--border-subtle); }
+    .arrow-line::after { content: ''; position: absolute; right: -1px; top: -5px; border: 6px solid transparent; border-left-color: var(--border-subtle); }
+    .arrow-line.active { background: var(--accent); animation: arrowFlow 1.5s linear infinite; }
+    .arrow-line.active::after { border-left-color: var(--accent); }
+    @keyframes arrowFlow { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+    /* SVG Progress Ring */
+    .progress-ring-wrap { position: relative; width: 90px; height: 90px; margin-bottom: 14px; }
+    .progress-ring { transform: rotate(-90deg); }
+    .progress-ring-bg { fill: none; stroke: rgba(255,255,255,0.04); stroke-width: 5; }
+    .progress-ring-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease, stroke 0.3s; }
+    .progress-ring-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
+    .progress-ring-text .unit { font-size: 0.6875rem; color: var(--text-muted); font-weight: 500; margin-left: 1px; }
+
+    .stage-label { font-size: 0.9375rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.01em; }
+    .stage-status { font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 10px; display: inline-block; margin-bottom: 10px; }
+    .stage-status.idle { background: rgba(255,255,255,0.04); color: var(--text-dim); }
+    .stage-status.running { background: var(--accent-subtle); color: var(--accent); animation: statusPulse 1.5s ease-in-out infinite; }
+    .stage-status.done { background: var(--success-subtle); color: var(--success); }
+    .stage-status.error { background: var(--error-subtle); color: var(--error); }
+    @keyframes statusPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.65; } }
+
+    .stage-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; line-height: 1.5; min-height: 18px; }
+
+    /* ═══════ STATS ROW ═══════ */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px 18px; text-align: center; }
+    .stat-value { font-size: 1.75rem; font-weight: 800; color: var(--text-primary); line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .stat-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+    .stat-card.accent .stat-value { color: var(--accent); }
+    .stat-card.blue .stat-value { color: var(--blue); }
+    .stat-card.success .stat-value { color: var(--success); }
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.purple .stat-value { color: var(--purple); }
+    .stat-card.error .stat-value { color: var(--error); }
+
+    /* ═══════ TWO-COLUMN BOTTOM ═══════ */
+    .monitor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 800px) { .monitor-grid { grid-template-columns: 1fr; } .pipeline-flow { flex-direction: column; } .pipeline-arrow { width: auto; height: 36px; transform: rotate(90deg); } }
+
+    /* ═══════ ADAPTER CARDS ═══════ */
+    .panel-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; }
+    .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
+    .panel-title { font-size: 0.875rem; font-weight: 700; color: var(--text-primary); }
+    .panel-body { padding: 12px 16px; max-height: 380px; overflow-y: auto; }
+
+    .adapter-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border-subtle); }
+    .adapter-row:last-child { border-bottom: none; }
+    .adapter-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .adapter-dot.idle { background: var(--text-dim); }
+    .adapter-dot.running { background: var(--accent); animation: livePulse 1.5s ease-in-out infinite; }
+    .adapter-dot.done { background: var(--success); }
+    .adapter-dot.error { background: var(--error); }
+    .adapter-name { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); flex: 1; }
+    .adapter-bar-wrap { flex: 1; max-width: 120px; height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; }
+    .adapter-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; background: var(--accent); }
+    .adapter-count { font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+
+    /* ═══════ LIVE FEED ═══════ */
+    .feed-entry { display: flex; gap: 10px; padding: 7px 4px; border-bottom: 1px solid rgba(255,255,255,0.02); font-size: 0.8125rem; animation: feedIn 0.3s ease; }
+    @keyframes feedIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .feed-icon { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; margin-top: 1px; }
+    .feed-icon.discover { background: var(--purple-subtle); color: var(--purple); }
+    .feed-icon.match { background: var(--blue-subtle); color: var(--blue); }
+    .feed-icon.success { background: var(--success-subtle); color: var(--success); }
+    .feed-icon.error { background: var(--error-subtle); color: var(--error); }
+    .feed-icon.warn { background: var(--warning-subtle); color: var(--warning); }
+    .feed-icon.info { background: rgba(255,255,255,0.04); color: var(--text-dim); }
+    .feed-text { flex: 1; color: var(--text-secondary); line-height: 1.45; }
+    .feed-text strong { color: var(--text-primary); font-weight: 600; }
+    .feed-time { font-size: 0.6875rem; color: var(--text-dim); flex-shrink: 0; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .feed-empty { text-align: center; color: var(--text-dim); padding: 40px 16px; font-size: 0.8125rem; }
+
+    /* ═══════ MATCH SCORE VIZ ═══════ */
+    .score-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .score-label { font-size: 0.6875rem; color: var(--text-muted); width: 50px; text-align: right; }
+    .score-track { flex: 1; height: 14px; background: rgba(255,255,255,0.03); border-radius: 3px; overflow: hidden; position: relative; }
+    .score-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; position: relative; }
+    .score-fill.s90 { background: linear-gradient(90deg, var(--success), #2dd4bf); }
+    .score-fill.s80 { background: linear-gradient(90deg, var(--blue), #60a5fa); }
+    .score-fill.s70 { background: linear-gradient(90deg, var(--purple), #a78bfa); }
+    .score-fill.s60 { background: linear-gradient(90deg, var(--warning), #fbbf24); }
+    .score-fill.s0 { background: linear-gradient(90deg, var(--error), #f87171); }
+    .score-count { font-size: 0.6875rem; color: var(--text-secondary); min-width: 28px; font-variant-numeric: tabular-nums; }
+
+    /* ═══════ PARTICLE FLOW (decorative) ═══════ */
+    .particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+    .particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); opacity: 0; }
+    .stage-card.active .particles .particle { animation: particleFloat 3s ease-in-out infinite; }
+    @keyframes particleFloat {
+        0% { opacity: 0; transform: translateY(20px) scale(0.5); }
+        30% { opacity: 0.6; }
+        70% { opacity: 0.3; }
+        100% { opacity: 0; transform: translateY(-40px) scale(0); }
+    }
+{% endblock %}
+
+{% block body %}
+<div class="page-content">
+<div class="monitor-container">
+    <h1 class="monitor-title">Pipeline Monitor</h1>
+    <div class="monitor-subtitle">
+        <span class="live-dot"></span>
+        <span>Real-time pipeline visualization</span>
+        <span id="monitorUptime" style="margin-left:auto;font-size:0.75rem;color:var(--text-dim)"></span>
+    </div>
+
+    <!-- ═══════ PIPELINE FLOW ═══════ -->
+    <div class="pipeline-flow">
+        <!-- Discovery Stage -->
+        <div class="pipeline-stage">
+            <div class="stage-card" id="stageDiscovery">
+                <div class="particles" id="particlesDiscovery"></div>
+                <div class="progress-ring-wrap">
+                    <svg class="progress-ring" width="90" height="90" viewBox="0 0 90 90">
+                        <circle class="progress-ring-bg" cx="45" cy="45" r="38"/>
+                        <circle class="progress-ring-fill" id="ringDiscovery" cx="45" cy="45" r="38" stroke="var(--purple)" stroke-dasharray="238.76" stroke-dashoffset="238.76"/>
+                    </svg>
+                    <div class="progress-ring-text"><span id="ringDiscoveryVal">0</span></div>
+                </div>
+                <div class="stage-label">Discovery</div>
+                <div class="stage-status idle" id="statusDiscovery">Idle</div>
+                <div class="stage-detail" id="detailDiscovery">Waiting...</div>
+            </div>
+        </div>
+
+        <div class="pipeline-arrow"><div class="arrow-line" id="arrow1"></div></div>
+
+        <!-- Matching Stage -->
+        <div class="pipeline-stage">
+            <div class="stage-card" id="stageMatching">
+                <div class="particles" id="particlesMatching"></div>
+                <div class="progress-ring-wrap">
+                    <svg class="progress-ring" width="90" height="90" viewBox="0 0 90 90">
+                        <circle class="progress-ring-bg" cx="45" cy="45" r="38"/>
+                        <circle class="progress-ring-fill" id="ringMatching" cx="45" cy="45" r="38" stroke="var(--blue)" stroke-dasharray="238.76" stroke-dashoffset="238.76"/>
+                    </svg>
+                    <div class="progress-ring-text"><span id="ringMatchingVal">0</span><span class="unit">%</span></div>
+                </div>
+                <div class="stage-label">Matching</div>
+                <div class="stage-status idle" id="statusMatching">Idle</div>
+                <div class="stage-detail" id="detailMatching">Waiting...</div>
+            </div>
+        </div>
+
+        <div class="pipeline-arrow"><div class="arrow-line" id="arrow2"></div></div>
+
+        <!-- Application Stage -->
+        <div class="pipeline-stage">
+            <div class="stage-card" id="stageApplication">
+                <div class="particles" id="particlesApplication"></div>
+                <div class="progress-ring-wrap">
+                    <svg class="progress-ring" width="90" height="90" viewBox="0 0 90 90">
+                        <circle class="progress-ring-bg" cx="45" cy="45" r="38"/>
+                        <circle class="progress-ring-fill" id="ringApplication" cx="45" cy="45" r="38" stroke="var(--success)" stroke-dasharray="238.76" stroke-dashoffset="238.76"/>
+                    </svg>
+                    <div class="progress-ring-text"><span id="ringApplicationVal">0</span></div>
+                </div>
+                <div class="stage-label">Application</div>
+                <div class="stage-status idle" id="statusApplication">Idle</div>
+                <div class="stage-detail" id="detailApplication">Waiting...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ STATS ROW ═══════ -->
+    <div class="stats-row">
+        <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Jobs</div></div>
+        <div class="stat-card accent"><div class="stat-value" id="statNew">0</div><div class="stat-label">New</div></div>
+        <div class="stat-card blue"><div class="stat-value" id="statMatched">0</div><div class="stat-label">Matched</div></div>
+        <div class="stat-card success"><div class="stat-value" id="statApplied">0</div><div class="stat-label">Applied</div></div>
+        <div class="stat-card warning"><div class="stat-value" id="statToday">0</div><div class="stat-label">Today</div></div>
+        <div class="stat-card error"><div class="stat-value" id="statErrors">0</div><div class="stat-label">Errors</div></div>
+    </div>
+
+    <!-- ═══════ TWO-COLUMN BOTTOM ═══════ -->
+    <div class="monitor-grid">
+        <!-- Left: Adapter Status + Score Distribution -->
+        <div>
+            <div class="panel-card" style="margin-bottom:16px">
+                <div class="panel-header">
+                    <div class="panel-title">Adapter Status</div>
+                    <div id="adapterSummary" style="font-size:0.75rem;color:var(--text-dim)"></div>
+                </div>
+                <div class="panel-body" id="adapterList">
+                    <div class="feed-empty">Loading adapters...</div>
+                </div>
+            </div>
+            <div class="panel-card">
+                <div class="panel-header">
+                    <div class="panel-title">Match Score Distribution</div>
+                </div>
+                <div class="panel-body" id="scoreDistribution" style="padding:16px 20px;">
+                    <div class="feed-empty">No scores yet</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Live Activity Feed -->
+        <div class="panel-card">
+            <div class="panel-header">
+                <div class="panel-title">Live Activity</div>
+                <div style="font-size:0.6875rem;color:var(--text-dim)" id="feedCount">0 events</div>
+            </div>
+            <div class="panel-body" id="liveFeed" style="max-height:520px;">
+                <div class="feed-empty">No activity yet. Start a discovery or matching run.</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/monitor.js"></script>
+{% endblock %}

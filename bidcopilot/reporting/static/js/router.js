@@ -14,6 +14,7 @@
     var NAV_MAP = {
         '/': 'dashboard',
         '/profile': 'profile',
+        '/monitor': 'monitor',
         '/admin': 'admin'
     };
 
