@@ -30,6 +30,16 @@ class SearchParams(BaseModel):
     categories: list[str] = Field(default_factory=list)
     max_pages: int = 5
     max_results: int = 100
+    # Platform-specific filters (e.g. Jobright)
+    work_models: list[str] = Field(default_factory=list)
+    industries: list[str] = Field(default_factory=list)
+    excluded_industries: list[str] = Field(default_factory=list)
+    skills_filter: list[str] = Field(default_factory=list)
+    excluded_skills: list[str] = Field(default_factory=list)
+    role_type: str | None = None
+    company_stages: list[str] = Field(default_factory=list)
+    h1b_only: bool = False
+    exclude_staffing_agency: bool = False
 
 class RawJobListing(BaseModel):
     external_id: str

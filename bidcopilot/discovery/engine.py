@@ -68,6 +68,25 @@ class DiscoveryEngine:
             updates["max_pages"] = override.max_pages
         if override.max_results is not None:
             updates["max_results"] = override.max_results
+        # Platform-specific filters
+        if override.work_models:
+            updates["work_models"] = override.work_models
+        if override.industries:
+            updates["industries"] = override.industries
+        if override.excluded_industries:
+            updates["excluded_industries"] = override.excluded_industries
+        if override.skills:
+            updates["skills_filter"] = override.skills
+        if override.excluded_skills:
+            updates["excluded_skills"] = override.excluded_skills
+        if override.role_type:
+            updates["role_type"] = override.role_type
+        if override.company_stages:
+            updates["company_stages"] = override.company_stages
+        if override.h1b_only:
+            updates["h1b_only"] = True
+        if override.exclude_staffing_agency:
+            updates["exclude_staffing_agency"] = True
 
         return base.model_copy(update=updates)
 

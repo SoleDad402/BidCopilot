@@ -996,6 +996,12 @@ async def get_discovery_config():
                 "supports_salary_filter": cls.supports_salary_filter,
                 "requires_auth": cls.requires_auth,
                 "enabled": name in _config.enabled_sites,
+                # Rich filter metadata (Jobright, etc.)
+                "supported_job_types": getattr(cls, "SUPPORTED_JOB_TYPES", []),
+                "supported_work_models": getattr(cls, "SUPPORTED_WORK_MODELS", []),
+                "supported_seniority": getattr(cls, "SUPPORTED_SENIORITY", []),
+                "supported_company_stages": getattr(cls, "SUPPORTED_COMPANY_STAGES", []),
+                "supported_role_types": getattr(cls, "SUPPORTED_ROLE_TYPES", []),
             }
             for name, cls in sorted(all_adapters.items())
         },

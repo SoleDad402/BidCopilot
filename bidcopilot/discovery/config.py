@@ -20,6 +20,18 @@ class AdapterSettings(BaseModel):
     max_pages: int | None = None
     max_results: int | None = None
     rate_limit_rpm: int | None = None
+    # Jobright-specific filters (also available for future adapters)
+    work_models: list[str] | None = None  # ["remote", "hybrid", "onsite"]
+    industries: list[str] | None = None
+    excluded_industries: list[str] | None = None
+    skills: list[str] | None = None
+    excluded_skills: list[str] | None = None
+    role_type: str | None = None  # "IC" or "Manager"
+    company_stages: list[str] | None = None
+    h1b_only: bool | None = None
+    exclude_staffing_agency: bool | None = None
+    exclude_security_clearance: bool | None = None
+    exclude_us_citizen_only: bool | None = None
     custom: dict[str, Any] = Field(default_factory=dict)
 
 

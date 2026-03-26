@@ -175,12 +175,83 @@
             html += '</div>';
 
             // Max pages
-            html += '<div style="display:flex;gap:12px;">';
+            html += '<div style="display:flex;gap:12px;margin-bottom:10px">';
             html += '<div><label class="form-label">Max Pages</label>' +
                 '<input type="number" class="form-input" style="width:80px" data-adapter="' + E(name) + '" data-field="max_pages" value="' + (override.max_pages || '') + '" placeholder="global" oninput="markDirty()"></div>';
             html += '<div><label class="form-label">Max Results</label>' +
                 '<input type="number" class="form-input" style="width:80px" data-adapter="' + E(name) + '" data-field="max_results" value="' + (override.max_results || '') + '" placeholder="global" oninput="markDirty()"></div>';
             html += '</div>';
+
+            // ── Rich filters (Jobright-style) ──
+            var hasRichFilters = (meta.supported_work_models && meta.supported_work_models.length > 0) ||
+                                 (meta.supported_seniority && meta.supported_seniority.length > 0);
+
+            if (hasRichFilters) {
+                html += '<div style="border-top:1px solid var(--border-subtle);margin-top:12px;padding-top:12px">';
+                html += '<div style="font-size:0.75rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Advanced Filters</div>';
+
+                // Work Model
+                if (meta.supported_work_models && meta.supported_work_models.length > 0) {
+                    var currentWM = override.work_models || [];
+                    html += '<div style="margin-bottom:10px"><label class="form-label">Work Model</label><div class="chip-grid" id="wm_' + name + '">';
+                    meta.supported_work_models.forEach(function (wm) {
+                        var active = currentWM.indexOf(wm) !== -1;
+                        html += '<span class="chip' + (active ? ' active' : '') + '" onclick="window.discoveryToggleChip(this,\'wm_' + name + '\')">' + E(wm) + '</span>';
+                    });
+                    html += '</div></div>';
+                }
+
+                // Seniority (adapter-specific, may differ from global)
+                if (meta.supported_seniority && meta.supported_seniority.length > 0) {
+                    html += '<div style="margin-bottom:10px"><label class="form-label">Experience Level</label><div class="chip-grid" id="sen_' + name + '">';
+                    meta.supported_seniority.forEach(function (s) {
+                        html += '<span class="chip" onclick="window.discoveryToggleChip(this,\'sen_' + name + '\')">' + E(s.replace(/_/g, ' ')) + '</span>';
+                    });
+                    html += '</div></div>';
+                }
+
+                // Company Stage
+                if (meta.supported_company_stages && meta.supported_company_stages.length > 0) {
+                    var currentCS = override.company_stages || [];
+                    html += '<div style="margin-bottom:10px"><label class="form-label">Company Stage</label><div class="chip-grid" id="cs_' + name + '">';
+                    meta.supported_company_stages.forEach(function (cs) {
+                        var active = currentCS.indexOf(cs) !== -1;
+                        html += '<span class="chip' + (active ? ' active' : '') + '" onclick="window.discoveryToggleChip(this,\'cs_' + name + '\')">' + E(cs) + '</span>';
+                    });
+                    html += '</div></div>';
+                }
+
+                // Role Type
+                if (meta.supported_role_types && meta.supported_role_types.length > 0) {
+                    var currentRT = override.role_type || '';
+                    html += '<div style="margin-bottom:10px"><label class="form-label">Role Type</label><div class="chip-grid" id="rt_' + name + '">';
+                    meta.supported_role_types.forEach(function (rt) {
+                        var active = currentRT === rt;
+                        html += '<span class="chip' + (active ? ' active' : '') + '" onclick="window.discoverySelectOne(this,\'rt_' + name + '\')">' + E(rt) + '</span>';
+                    });
+                    html += '</div></div>';
+                }
+
+                // Industries
+                html += '<div style="margin-bottom:10px"><label class="form-label">Industries</label>';
+                html += tagInputHtml('ind_' + name, override.industries || [], 'e.g. Information Technology, AI, Software...');
+                html += '</div>';
+
+                // Skills filter
+                html += '<div style="margin-bottom:10px"><label class="form-label">Required Skills</label>';
+                html += tagInputHtml('sk_' + name, override.skills || [], 'e.g. JavaScript, Python, AWS...');
+                html += '</div>';
+
+                // Toggle options
+                html += '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">';
+                html += '<label style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-secondary);cursor:pointer">' +
+                    '<input type="checkbox" data-adapter="' + E(name) + '" data-field="h1b_only"' + (override.h1b_only ? ' checked' : '') + ' onchange="markDirty()" style="accent-color:var(--accent)"> H1B Sponsorship Only</label>';
+                html += '<label style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-secondary);cursor:pointer">' +
+                    '<input type="checkbox" data-adapter="' + E(name) + '" data-field="exclude_staffing_agency"' + (override.exclude_staffing_agency ? ' checked' : '') + ' onchange="markDirty()" style="accent-color:var(--accent)"> Exclude Staffing Agencies</label>';
+                html += '</div>';
+
+                html += '</div>';
+            }
 
             html += '</div>';
         });
@@ -224,6 +295,16 @@
 
     window.discoveryToggleCat = function (cb) {
         cb.parentElement.classList.toggle('checked', cb.checked);
+        markDirty();
+    };
+
+    // Single-select chip (radio-like)
+    window.discoverySelectOne = function (el, groupId) {
+        var group = document.getElementById(groupId);
+        if (!group) return;
+        var wasActive = el.classList.contains('active');
+        group.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
+        if (!wasActive) el.classList.add('active');
         markDirty();
     };
 
@@ -294,6 +375,23 @@
             var mrInput = card.querySelector('[data-field="max_results"]');
             if (mpInput && mpInput.value) settings.max_pages = Number(mpInput.value);
             if (mrInput && mrInput.value) settings.max_results = Number(mrInput.value);
+
+            // Rich filters (work models, company stages, role type, industries, skills, toggles)
+            var wmChips = collectChips('wm_' + name);
+            if (wmChips.length > 0) settings.work_models = wmChips;
+            var csChips = collectChips('cs_' + name);
+            if (csChips.length > 0) settings.company_stages = csChips;
+            var rtChips = collectChips('rt_' + name);
+            if (rtChips.length > 0) settings.role_type = rtChips[0];
+            var industries = collectTags('ind_' + name);
+            if (industries.length > 0) settings.industries = industries;
+            var skills = collectTags('sk_' + name);
+            if (skills.length > 0) settings.skills = skills;
+
+            var h1bCb = card.querySelector('[data-field="h1b_only"]');
+            if (h1bCb && h1bCb.checked) settings.h1b_only = true;
+            var staffCb = card.querySelector('[data-field="exclude_staffing_agency"]');
+            if (staffCb && staffCb.checked) settings.exclude_staffing_agency = true;
 
             if (Object.keys(settings).length > 0) {
                 adapters[name] = settings;
