@@ -429,7 +429,7 @@ async def _run_discovery_task():
     try:
         profile = _profile_manager.get()
         sites = _discovery_selected_sites or _config.enabled_sites
-        engine = DiscoveryEngine(enabled_sites=sites, on_progress=_progress_callback)
+        engine = DiscoveryEngine(enabled_sites=sites, on_progress=_progress_callback, discovery_config_path=_config.discovery_config_path)
         result = await engine.run_all(profile)
         state["discovery"] = {
             "status": "idle",

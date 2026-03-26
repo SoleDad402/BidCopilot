@@ -102,7 +102,7 @@ class DiscoveryEngine:
         adapter_names = [a.site_name for a in adapters]
         self._progress("discovery_start", {
             "adapters": adapter_names,
-            "keywords": params.keywords[:5],
+            "keywords": base_params.keywords[:5],
             "total_adapters": len(adapters),
         })
 
