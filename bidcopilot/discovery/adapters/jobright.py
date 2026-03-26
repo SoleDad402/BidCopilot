@@ -224,11 +224,11 @@ class JobrightAdapter(BaseJobSiteAdapter):
         # These come through params via the custom field in AdapterSettings
 
         page_size = 20
-        max_results = params.max_results or 100
+        max_results = params.max_results  # 0 = unlimited
         start_pos = 0
 
         async with httpx.AsyncClient(timeout=30) as client:
-            while start_pos < max_results:
+            while max_results == 0 or start_pos < max_results:
                 payload = {
                     "startPos": start_pos,
                     "sortCondition": "FRESHNESS",

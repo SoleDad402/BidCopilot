@@ -1,0 +1,50 @@
+global_settings:
+  keywords: []
+  seniority_levels:
+  - senior
+  - staff
+  - lead
+  - principal
+  job_types:
+  - full-time
+  remote_preference: remote_only
+  excluded_companies: []
+  posted_within_days: 30
+  max_results_per_adapter: 0
+  max_pages_default: 5
+adapters:
+  jobicy:
+    categories:
+    - engineering
+    - data-science
+    - devops-sysadmin
+    custom: {}
+  jobright:
+    categories:
+    - software-engineering
+    - data-ai
+    - infrastructure-security
+    keywords:
+    - javascript
+    - software
+    - web
+    - mobile
+    - ai
+    work_models:
+    - remote
+    custom: {}
+  remotive:
+    categories:
+    - software-dev
+    - data
+    - devops
+    - qa
+    custom: {}
+  weworkremotely:
+    categories:
+    - remote-jobs/programming
+    - remote-jobs/devops-sysadmin
+    - remote-jobs/full-stack-programming
+    - remote-jobs/back-end-programming
+    - remote-jobs/front-end-programming
+    custom: {}
