@@ -1,6 +1,7 @@
 """Matching engine — fast filter + LLM scoring."""
 from __future__ import annotations
 import json
+from typing import Callable
 from pydantic import BaseModel, Field
 from sqlmodel import select
 from bidcopilot.core.database import get_session
@@ -11,6 +12,13 @@ from bidcopilot.profile.schemas import UserProfile
 from bidcopilot.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Progress callback type: (event, data_dict) -> None
+ProgressCallback = Callable[[str, dict], None]
+
+def _noop_progress(event: str, data: dict) -> None:
+    pass
+
 
 class MatchResult(BaseModel):
     overall_score: int = 0
@@ -23,10 +31,12 @@ class MatchResult(BaseModel):
     tier: str = "filter"
 
 class MatchingEngine:
-    def __init__(self, llm_client=None, min_score: int = 70):
+    def __init__(self, llm_client=None, min_score: int = 70,
+                 on_progress: ProgressCallback | None = None):
         self.llm = llm_client
         self.min_score = min_score
         self.taxonomy = SkillsTaxonomy()
+        self._progress = on_progress or _noop_progress
 
     async def process_unscored_jobs(self, profile: UserProfile):
         async with get_session() as session:
@@ -36,8 +46,11 @@ class MatchingEngine:
             jobs = list(result.all())
 
         logger.info("matching_start", count=len(jobs))
+        self._progress("matching_start", {"total_jobs": len(jobs)})
+
         matched = 0
-        for job in jobs:
+        rejected = 0
+        for i, job in enumerate(jobs, 1):
             result = await self.score_job(job, profile)
             async with get_session() as session:
                 if result.overall_score >= self.min_score:
@@ -50,10 +63,27 @@ class MatchingEngine:
                     job.status = JobStatus.REJECTED.value
                     job.match_score = result.overall_score
                     job.match_reasoning = result.reasoning
+                    rejected += 1
                 session.add(job)
                 await session.commit()
 
+            self._progress("matching_progress", {
+                "current": i,
+                "total": len(jobs),
+                "matched": matched,
+                "rejected": rejected,
+                "latest": f"{job.title} @ {job.company}",
+                "score": result.overall_score,
+                "tier": result.tier,
+                "verdict": "matched" if result.overall_score >= self.min_score else "rejected",
+            })
+
         logger.info("matching_complete", total=len(jobs), matched=matched)
+        self._progress("matching_done", {
+            "total": len(jobs),
+            "matched": matched,
+            "rejected": rejected,
+        })
 
     async def score_job(self, job: Job, profile: UserProfile) -> MatchResult:
         rejection = self._fast_filter(job, profile)

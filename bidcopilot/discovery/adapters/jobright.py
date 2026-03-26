@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncIterator
 
 import httpx
@@ -31,6 +31,75 @@ TECH_CATEGORIES = [
 # Work model values: 1 = onsite, 2 = hybrid, 3 = remote
 WORK_MODEL_REMOTE = 3
 WORK_MODEL_HYBRID = 2
+
+
+# Known tech keywords to extract from requirement sentences.
+# Matched case-insensitively; the canonical casing here is used in output.
+_TECH_KEYWORDS = [
+    # Languages
+    "Python", "Java", "JavaScript", "TypeScript", "Go", "Golang", "Rust", "C++",
+    "C#", "Ruby", "Kotlin", "Swift", "Scala", "PHP", "Perl", "R", "Elixir",
+    "Haskell", "Lua", "Dart", "Clojure", "Groovy", "MATLAB", "Objective-C",
+    # Frontend
+    "React", "React Native", "Angular", "Vue.js", "Vue", "Next.js", "Nuxt",
+    "Svelte", "HTML", "CSS", "Tailwind", "Bootstrap", "Redux", "GraphQL",
+    "Webpack", "Vite",
+    # Backend / Frameworks
+    "Node.js", "Express", "Django", "Flask", "FastAPI", "Spring", "Spring Boot",
+    ".NET", "ASP.NET", "Rails", "Laravel", "NestJS", "Gin", "Fiber",
+    # Cloud & Infra
+    "AWS", "Azure", "GCP", "Google Cloud", "Kubernetes", "Docker", "Terraform",
+    "Ansible", "Pulumi", "CloudFormation", "Helm", "ArgoCD", "Istio",
+    "EKS", "ECS", "GKE", "AKS", "Lambda", "S3", "EC2", "RDS", "DynamoDB",
+    "SQS", "SNS", "VPC", "IAM", "CloudFront",
+    # Databases
+    "PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "Cassandra",
+    "SQLite", "Oracle", "SQL Server", "DynamoDB", "Neo4j", "CockroachDB",
+    "Snowflake", "BigQuery", "Redshift", "ClickHouse",
+    # Data / ML
+    "Spark", "Kafka", "Airflow", "Flink", "Hadoop", "Hive", "Presto",
+    "TensorFlow", "PyTorch", "scikit-learn", "Pandas", "NumPy", "MLflow",
+    "Databricks", "dbt", "Looker", "Tableau", "Power BI",
+    # DevOps / CI-CD
+    "Jenkins", "GitHub Actions", "GitLab CI", "CircleCI", "Travis CI",
+    "Datadog", "Prometheus", "Grafana", "Splunk", "New Relic", "PagerDuty",
+    "OpenTelemetry", "ELK", "Logstash", "Kibana",
+    # Messaging / Queues
+    "RabbitMQ", "Kafka", "NATS", "Celery", "Pub/Sub",
+    # Security
+    "OAuth", "SAML", "SSO", "OWASP", "SOC 2", "HIPAA", "PCI",
+    "Vault", "CyberArk", "Nessus", "Qualys", "Burp Suite",
+    # Tools / Practices
+    "Git", "Linux", "Nginx", "Apache", "REST", "gRPC", "WebSocket",
+    "Microservices", "CI/CD", "TDD", "Agile", "Scrum",
+    "Jira", "Confluence", "Figma",
+    # Mobile
+    "iOS", "Android", "Flutter", "SwiftUI", "UIKit", "Jetpack Compose",
+]
+
+# Pre-compile a lookup map: lowercase → canonical name
+_TECH_LOOKUP: dict[str, str] = {}
+for _kw in _TECH_KEYWORDS:
+    _key = _kw.lower()
+    if _key not in _TECH_LOOKUP:
+        _TECH_LOOKUP[_key] = _kw
+
+# Regex pattern: match whole words for each keyword (escaped for regex safety)
+_TECH_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in sorted(_TECH_LOOKUP, key=len, reverse=True)) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_tech_keywords(requirements: list[str]) -> list[str]:
+    """Extract real technology keywords from requirement sentences."""
+    found: dict[str, str] = {}  # lowercase → canonical
+    for req in requirements:
+        for match in _TECH_PATTERN.finditer(req):
+            key = match.group(0).lower()
+            if key not in found:
+                found[key] = _TECH_LOOKUP.get(key, match.group(0))
+    return list(found.values())[:15]
 
 
 @AdapterRegistry.register
@@ -113,19 +182,22 @@ class JobrightAdapter(BaseJobSiteAdapter):
                     if company and company.lower() in excluded_lower:
                         continue
 
-                    # Parse publish time (epoch ms)
+                    # Parse publish time — API returns UTC "YYYY-MM-DD HH:MM:SS"
                     pub_date = None
                     publish_time = job.get("publishTime")
                     if publish_time:
                         try:
                             if isinstance(publish_time, (int, float)):
-                                pub_date = datetime.fromtimestamp(publish_time / 1000)
+                                pub_date = datetime.fromtimestamp(publish_time / 1000, tz=timezone.utc)
                             elif isinstance(publish_time, str):
+                                pub_date = datetime.strptime(publish_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        except (ValueError, TypeError, OSError):
+                            try:
                                 pub_date = datetime.fromisoformat(
                                     publish_time.replace("Z", "+00:00")
                                 )
-                        except (ValueError, TypeError, OSError):
-                            pass
+                            except (ValueError, TypeError):
+                                pass
 
                     # Location display
                     location = job.get("jobLocation", "")
@@ -172,10 +244,15 @@ class JobrightAdapter(BaseJobSiteAdapter):
         if summary:
             base["description_text"] = summary + "\n\n" + base.get("description_text", "")
 
-        # Requirements as skills
+        # Requirements — append raw sentences to description for LLM matching,
+        # but extract actual tech keywords for the skill tags display
         requirements = data.get("requirements", [])
         if requirements and isinstance(requirements, list):
-            base["required_skills"] = requirements[:15]
+            base["description_text"] = (
+                base.get("description_text", "") + "\n\nRequirements:\n" +
+                "\n".join(f"- {r}" for r in requirements)
+            )
+            base["required_skills"] = _extract_tech_keywords(requirements)
 
         # Remote type
         is_remote = data.get("isRemote", False)

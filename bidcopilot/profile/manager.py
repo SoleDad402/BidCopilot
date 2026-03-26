@@ -35,11 +35,40 @@ class ProfileManager:
         return self._profile
 
     def create_default(self) -> UserProfile:
+        from bidcopilot.profile.schemas import Education, WorkExperience
+
         profile = UserProfile(
-            full_name="Your Name", email="your.email@example.com", phone="+1-555-000-0000",
-            location="Remote", current_title="Software Engineer", years_of_experience=5,
+            full_name="Your Name",
+            email="your.email@example.com",
+            phone="+1-555-000-0000",
+            location="Remote",
+            linkedin_url="https://linkedin.com/in/yourprofile",
+            github_url="https://github.com/yourprofile",
+            current_title="Software Engineer",
+            years_of_experience=5,
             target_titles=["Senior Software Engineer", "Staff Engineer", "Tech Lead"],
-            skills=[], specializations=["backend", "fullstack"], remote_preference="remote_only",
+            skills=[],
+            specializations=["backend", "fullstack"],
+            remote_preference="remote_only",
+            work_history=[
+                WorkExperience(
+                    company="Example Corp",
+                    title="Software Engineer",
+                    location="Remote",
+                    start_date="2020-01",
+                    is_current=True,
+                ),
+            ],
+            education=[
+                Education(
+                    school_name="University Name",
+                    location="City, State",
+                    degree="Bachelor of Science",
+                    field_of_study="Computer Science",
+                    start_date="2014-09",
+                    end_date="2018-05",
+                ),
+            ],
         )
         self.save(profile)
         return profile

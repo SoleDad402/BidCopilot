@@ -21,7 +21,9 @@
     /* ── Time Ago ── */
     function timeAgo(iso) {
         if (!iso) return '';
-        var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+        // DB stores UTC but without 'Z' suffix — ensure browser parses as UTC
+        var str = iso.endsWith('Z') ? iso : iso + 'Z';
+        var diff = (Date.now() - new Date(str).getTime()) / 1000;
         if (diff < 0) return 'just now';
         if (diff < 60) return Math.floor(diff) + 's ago';
         if (diff < 3600) return Math.floor(diff / 60) + 'm ago';

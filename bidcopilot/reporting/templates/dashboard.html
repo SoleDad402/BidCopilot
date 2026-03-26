@@ -99,7 +99,12 @@
         -webkit-backdrop-filter: var(--blur);
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
-        margin-bottom: 20px;
+        margin-bottom: 0;
+    }
+    .pipeline-strip.has-selector {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-bottom-color: transparent;
     }
     .pipeline-strip-title {
         font-size: 0.65rem;
@@ -134,6 +139,339 @@
         font-size: 0.6875rem;
         color: var(--text-dim);
         white-space: nowrap;
+    }
+
+    /* ================================================================
+       SOURCE SELECTOR
+       ================================================================ */
+    .source-selector {
+        background: var(--bg-card);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        padding: 0 20px;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.25s ease, padding 0.25s ease;
+        margin-bottom: 20px;
+    }
+    .source-selector.open {
+        max-height: 300px;
+        padding: 14px 20px 16px;
+    }
+    .source-selector-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    .source-selector-title {
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-dim);
+    }
+    .source-selector-actions {
+        display: flex;
+        gap: 8px;
+    }
+    .source-selector-actions button {
+        background: none;
+        border: none;
+        color: var(--accent);
+        font-size: 0.6875rem;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.15s ease;
+    }
+    .source-selector-actions button:hover {
+        background: rgba(255,255,255,0.05);
+    }
+    .source-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 6px 16px;
+    }
+    .source-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background 0.15s ease;
+    }
+    .source-checkbox:hover {
+        background: rgba(255,255,255,0.03);
+    }
+    .source-checkbox input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 1.5px solid var(--border-subtle);
+        border-radius: 4px;
+        background: transparent;
+        cursor: pointer;
+        position: relative;
+        flex-shrink: 0;
+        transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .source-checkbox input[type="checkbox"]:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+    }
+    .source-checkbox input[type="checkbox"]:checked::after {
+        content: '';
+        position: absolute;
+        left: 4px;
+        top: 1px;
+        width: 5px;
+        height: 9px;
+        border: solid var(--bg-base);
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+    .source-checkbox .source-name {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+    .source-checkbox .source-auth {
+        font-size: 0.5625rem;
+        color: var(--text-dim);
+        margin-left: auto;
+    }
+    .toggle-sources-btn {
+        background: none;
+        border: 1px solid var(--border-subtle);
+        color: var(--text-secondary);
+        font-size: 0.6875rem;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        white-space: nowrap;
+    }
+    .toggle-sources-btn:hover {
+        background: rgba(255,255,255,0.04);
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .source-count-label {
+        font-size: 0.625rem;
+        color: var(--text-dim);
+        margin-left: 4px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ================================================================
+       CLEAR JOBS DROPDOWN
+       ================================================================ */
+    .dropdown-wrap {
+        position: relative;
+        display: inline-block;
+    }
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 4px);
+        background: var(--bg-elevated);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        min-width: 180px;
+        padding: 4px 0;
+        z-index: 100;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .dropdown-menu.show { display: block; }
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 14px;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.12s ease;
+    }
+    .dropdown-item:hover {
+        background: rgba(255,255,255,0.05);
+        color: var(--text-primary);
+    }
+    .dropdown-item.danger { color: var(--error); }
+    .dropdown-item.danger:hover {
+        background: var(--error-subtle);
+        color: var(--error);
+    }
+    .dropdown-sep {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 0;
+    }
+
+    /* ================================================================
+       LIVE CONSOLE
+       ================================================================ */
+    .console-wrap {
+        margin-bottom: 20px;
+    }
+    .console-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        background: var(--bg-card);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        user-select: none;
+    }
+    .console-toggle:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--border-subtle);
+    }
+    .console-toggle.open {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-bottom-color: transparent;
+    }
+    .console-toggle-icon {
+        font-size: 0.875rem;
+        transition: transform 0.2s ease;
+        color: var(--text-dim);
+    }
+    .console-toggle.open .console-toggle-icon {
+        transform: rotate(90deg);
+    }
+    .console-toggle-title {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+    }
+    .console-toggle-status {
+        font-size: 0.625rem;
+        color: var(--text-dim);
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+    }
+    .console-toggle-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--text-dim);
+        flex-shrink: 0;
+    }
+    .console-toggle-dot.active {
+        background: var(--success);
+        box-shadow: 0 0 6px var(--success);
+        animation: consolePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes consolePulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+    .console-panel {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+        background: #0d1117;
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    }
+    .console-panel.open {
+        max-height: 400px;
+    }
+    .console-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        background: rgba(255,255,255,0.02);
+    }
+    .console-toolbar-label {
+        font-size: 0.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-dim);
+    }
+    .console-toolbar .btn {
+        padding: 2px 8px;
+        font-size: 0.625rem;
+    }
+    .console-toolbar-spacer { flex: 1; }
+    .console-entries {
+        height: 320px;
+        overflow-y: auto;
+        padding: 8px 0;
+        font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
+        font-size: 0.6875rem;
+        line-height: 1.65;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.1) transparent;
+    }
+    .console-entries::-webkit-scrollbar { width: 6px; }
+    .console-entries::-webkit-scrollbar-track { background: transparent; }
+    .console-entries::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+        border-radius: 3px;
+    }
+    .console-line {
+        display: flex;
+        gap: 8px;
+        padding: 1px 16px;
+        transition: background 0.1s ease;
+    }
+    .console-line:hover {
+        background: rgba(255,255,255,0.02);
+    }
+    .console-ts {
+        color: rgba(255,255,255,0.2);
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+    }
+    .console-event {
+        flex-shrink: 0;
+        min-width: 120px;
+        font-weight: 600;
+    }
+    .console-msg {
+        color: rgba(255,255,255,0.65);
+        word-break: break-word;
+    }
+    /* Event type colors */
+    .console-event.discovery_start,
+    .console-event.matching_start { color: #58a6ff; }
+    .console-event.adapter_start { color: #d2a8ff; }
+    .console-event.adapter_progress,
+    .console-event.matching_progress { color: rgba(255,255,255,0.4); }
+    .console-event.adapter_done { color: #3fb950; }
+    .console-event.adapter_error { color: #f85149; }
+    .console-event.discovery_done,
+    .console-event.matching_done { color: #3fb950; font-weight: 700; }
+    .console-event.warn { color: #d29922; }
+    .console-empty {
+        padding: 40px 16px;
+        text-align: center;
+        color: rgba(255,255,255,0.2);
+        font-size: 0.75rem;
     }
 
     /* ================================================================
@@ -327,7 +665,7 @@
     </div>
 
     <!-- PIPELINE STRIP -->
-    <div class="pipeline-strip">
+    <div class="pipeline-strip" id="pipelineStrip">
         <span class="pipeline-strip-title">Pipeline</span>
         <div class="pipeline-divider"></div>
         <div class="pipeline-item">
@@ -339,8 +677,51 @@
             <button class="btn btn-blue" id="btnMatch" onclick="triggerPipeline('match')">Run Matching</button>
             <span class="badge badge-idle" id="pipeMatchBadge">Idle</span>
         </div>
+        <div class="pipeline-divider"></div>
+        <div class="pipeline-item">
+            <button class="toggle-sources-btn" id="btnToggleSources" onclick="toggleSourceSelector()">
+                Sources <span class="source-count-label" id="sourceCountLabel"></span>
+            </button>
+        </div>
         <div class="pipeline-spacer"></div>
         <span class="pipeline-lastrun" id="lastDiscovery"></span>
+    </div>
+
+    <!-- SOURCE SELECTOR (collapsible) -->
+    <div class="source-selector" id="sourceSelector">
+        <div class="source-selector-header">
+            <span class="source-selector-title">Select Job Sources for Discovery</span>
+            <div class="source-selector-actions">
+                <button onclick="selectAllSources()">Select All</button>
+                <button onclick="deselectAllSources()">Deselect All</button>
+            </div>
+        </div>
+        <div class="source-grid" id="sourceGrid">
+            <!-- populated by JS -->
+        </div>
+    </div>
+
+    <!-- LIVE CONSOLE -->
+    <div class="console-wrap">
+        <div class="console-toggle" id="consoleToggle" onclick="toggleConsole()">
+            <span class="console-toggle-icon">&#x25B6;</span>
+            <span class="console-toggle-dot" id="consoleDot"></span>
+            <span class="console-toggle-title">Live Process Console</span>
+            <span class="console-toggle-status" id="consoleStatus">No activity</span>
+        </div>
+        <div class="console-panel" id="consolePanel">
+            <div class="console-toolbar">
+                <span class="console-toolbar-label">Output</span>
+                <span class="console-toolbar-spacer"></span>
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.625rem;color:var(--text-dim);cursor:pointer">
+                    <input type="checkbox" id="consoleAutoScroll" checked style="width:12px;height:12px"> Auto-scroll
+                </label>
+                <button class="btn btn-ghost btn-sm" onclick="clearConsole()">Clear</button>
+            </div>
+            <div class="console-entries" id="consoleEntries">
+                <div class="console-empty">Run a pipeline task to see live output here</div>
+            </div>
+        </div>
     </div>
 
     <!-- TWO-COLUMN LAYOUT -->
@@ -350,9 +731,18 @@
         <div class="left-col">
 
             <!-- JOBS TABLE -->
-            <div class="card">
+            <div class="card card-jobs">
                 <div class="card-header">
                     <h3 class="card-title">Jobs</h3>
+                    <div class="dropdown-wrap">
+                        <button class="btn btn-ghost btn-sm" onclick="toggleClearMenu(event)">Clear Jobs &#x25BE;</button>
+                        <div class="dropdown-menu" id="clearJobsMenu">
+                            <button class="dropdown-item" onclick="clearJobs('today')">Clear today's jobs</button>
+                            <button class="dropdown-item" onclick="clearJobs('new')">Clear unscored (new)</button>
+                            <div class="dropdown-sep"></div>
+                            <button class="dropdown-item danger" onclick="clearJobs('all')">Clear all jobs</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-bar">
                     <input type="text" class="filter-input" id="jobSearch" placeholder="Search by title, company, or location..." oninput="debounceJobSearch()">
@@ -456,12 +846,115 @@
     var jobPage = 1;
     var queuePage = 1;
     var searchTimeout = null;
+    var allAdapters = [];       // [{name, requires_auth, enabled}]
+    var selectorOpen = false;
 
     // Show initial skeletons
     document.getElementById('jobsBody').innerHTML = tableSkeletonRows(6, 8);
     document.getElementById('sourcesBody').innerHTML = tableSkeletonRows(7, 4);
     document.getElementById('queueBody').innerHTML = queueSkeletonCards(4);
     document.getElementById('activityBody').innerHTML = activitySkeletonItems(5);
+
+    // ----------------------------------------------------------------
+    // SOURCE SELECTOR
+    // ----------------------------------------------------------------
+    function loadAdapters() {
+        api('/api/adapters').then(function(d) {
+            allAdapters = d.adapters || [];
+            renderSourceGrid();
+            updateSourceCountLabel();
+        }).catch(function() {});
+    }
+
+    function renderSourceGrid() {
+        var grid = document.getElementById('sourceGrid');
+        grid.innerHTML = allAdapters.map(function(a) {
+            var checked = a.enabled ? ' checked' : '';
+            var authNote = a.requires_auth ? '<span class="source-auth">auth</span>' : '';
+            return '<label class="source-checkbox">' +
+                '<input type="checkbox" value="' + esc(a.name) + '"' + checked +
+                ' onchange="updateSourceCountLabel()">' +
+                '<span class="source-name">' + esc(a.name) + '</span>' +
+                authNote +
+                '</label>';
+        }).join('');
+    }
+
+    function getSelectedSites() {
+        var checks = document.querySelectorAll('#sourceGrid input[type="checkbox"]');
+        var selected = [];
+        for (var i = 0; i < checks.length; i++) {
+            if (checks[i].checked) selected.push(checks[i].value);
+        }
+        return selected;
+    }
+
+    window.updateSourceCountLabel = function() {
+        var selected = getSelectedSites();
+        var label = document.getElementById('sourceCountLabel');
+        label.textContent = '(' + selected.length + '/' + allAdapters.length + ')';
+    };
+
+    window.toggleSourceSelector = function() {
+        selectorOpen = !selectorOpen;
+        var panel = document.getElementById('sourceSelector');
+        var strip = document.getElementById('pipelineStrip');
+        if (selectorOpen) {
+            panel.classList.add('open');
+            strip.classList.add('has-selector');
+        } else {
+            panel.classList.remove('open');
+            strip.classList.remove('has-selector');
+        }
+    };
+
+    window.selectAllSources = function() {
+        var checks = document.querySelectorAll('#sourceGrid input[type="checkbox"]');
+        for (var i = 0; i < checks.length; i++) checks[i].checked = true;
+        updateSourceCountLabel();
+    };
+
+    window.deselectAllSources = function() {
+        var checks = document.querySelectorAll('#sourceGrid input[type="checkbox"]');
+        for (var i = 0; i < checks.length; i++) checks[i].checked = false;
+        updateSourceCountLabel();
+    };
+
+    // ----------------------------------------------------------------
+    // CLEAR JOBS
+    // ----------------------------------------------------------------
+    window.toggleClearMenu = function(e) {
+        e.stopPropagation();
+        var menu = document.getElementById('clearJobsMenu');
+        menu.classList.toggle('show');
+    };
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function() {
+        var menu = document.getElementById('clearJobsMenu');
+        if (menu) menu.classList.remove('show');
+    });
+
+    var CLEAR_LABELS = {today: "today's jobs", new: 'unscored (new) jobs', all: 'ALL jobs'};
+
+    window.clearJobs = function(scope) {
+        document.getElementById('clearJobsMenu').classList.remove('show');
+        if (!confirm('Delete ' + CLEAR_LABELS[scope] + '? This cannot be undone.')) return;
+
+        api('/api/jobs/clear', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({scope: scope})
+        }).then(function(d) {
+            showToast('Deleted ' + d.deleted + ' jobs', 'success');
+            loadStats();
+            loadJobs(1);
+            loadQueue(1);
+            loadActivity();
+        }).catch(function() {
+            showToast('Failed to clear jobs', 'error');
+        });
+    };
 
     // ----------------------------------------------------------------
     // LOAD STATS
@@ -543,7 +1036,7 @@
                     '<td><span style="font-size:0.75rem;color:var(--text-secondary)">' + esc(j.site_name || '-') + '</span></td>' +
                     '<td>' + (sc != null ? '<span class="score ' + scoreClass + '">' + sc + '</span>' : '<span style="color:var(--text-dim)">--</span>') + '</td>' +
                     '<td><span class="badge badge-' + (j.status || 'new') + '">' + esc(j.status || 'new') + '</span></td>' +
-                    '<td><span class="tabnum" style="font-size:0.6875rem;color:var(--text-dim);white-space:nowrap">' + (j.discovered_at ? timeAgo(j.discovered_at) : '--') + '</span></td>' +
+                    '<td><span class="tabnum" style="font-size:0.6875rem;color:var(--text-dim);white-space:nowrap">' + (j.posted_date ? timeAgo(j.posted_date) : (j.discovered_at ? timeAgo(j.discovered_at) : '--')) + '</span></td>' +
                     '<td><select class="action-select" onchange="updateJobStatus(' + j.id + ', this.value)">' +
                     '<option value="">Change...</option>' +
                     '<option value="new">New</option>' +
@@ -704,7 +1197,20 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner spinner-sm"></span> Running...';
 
-        api('/api/pipeline/' + action, {method: 'POST'}).then(function(d) {
+        var fetchOpts = {method: 'POST'};
+        if (action === 'discover') {
+            var selected = getSelectedSites();
+            if (selected.length === 0) {
+                showToast('Select at least one source', 'warning');
+                btn.disabled = false;
+                btn.textContent = origText;
+                return;
+            }
+            fetchOpts.headers = {'Content-Type': 'application/json'};
+            fetchOpts.body = JSON.stringify({sites: selected});
+        }
+
+        api('/api/pipeline/' + action, fetchOpts).then(function(d) {
             if (d.ok === false) {
                 showToast(d.message, 'warning');
                 btn.disabled = false;
@@ -745,6 +1251,176 @@
     };
 
     // ----------------------------------------------------------------
+    // LIVE CONSOLE
+    // ----------------------------------------------------------------
+    var consoleOpen = false;
+    var consoleLastId = 0;
+    var consolePollTimer = null;
+    var consoleHasEntries = false;
+
+    window.toggleConsole = function() {
+        consoleOpen = !consoleOpen;
+        var toggle = document.getElementById('consoleToggle');
+        var panel = document.getElementById('consolePanel');
+        if (consoleOpen) {
+            toggle.classList.add('open');
+            panel.classList.add('open');
+            startConsolePoll();
+        } else {
+            toggle.classList.remove('open');
+            panel.classList.remove('open');
+            stopConsolePoll();
+        }
+    };
+
+    window.clearConsole = function() {
+        api('/api/live-log/clear', {method: 'POST'}).then(function() {
+            document.getElementById('consoleEntries').innerHTML =
+                '<div class="console-empty">Console cleared</div>';
+            consoleHasEntries = false;
+            consoleLastId = 0;
+        }).catch(function() {});
+    };
+
+    function formatConsoleEvent(entry) {
+        var ev = entry.event || '';
+        var ts = '';
+        if (entry.ts) {
+            var d = new Date(entry.ts);
+            ts = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        }
+
+        var msg = '';
+        switch (ev) {
+            case 'discovery_start':
+                msg = 'Starting discovery with ' + (entry.total_adapters || '?') +
+                      ' adapters: ' + (entry.adapters || []).join(', ');
+                if (entry.keywords && entry.keywords.length)
+                    msg += ' | Keywords: ' + entry.keywords.slice(0, 3).join(', ');
+                break;
+            case 'adapter_start':
+                msg = 'Scanning ' + esc(entry.adapter || '') + '...';
+                break;
+            case 'adapter_progress':
+                msg = esc(entry.adapter || '') + ' — found ' + (entry.found || 0) +
+                      ' jobs so far | Latest: ' + esc(entry.latest || '');
+                break;
+            case 'adapter_done':
+                msg = esc(entry.adapter || '') + ' complete — ' +
+                      (entry.found || 0) + ' found, ' + (entry['new'] || 0) + ' new';
+                break;
+            case 'adapter_error':
+                msg = esc(entry.adapter || '') + ' ERROR: ' + esc(entry.error || 'unknown');
+                break;
+            case 'discovery_done':
+                msg = 'Discovery finished — Total: ' + (entry.total_found || 0) +
+                      ' found, ' + (entry.total_new || 0) + ' new';
+                break;
+            case 'matching_start':
+                msg = 'Scoring ' + (entry.total_jobs || 0) + ' unscored jobs...';
+                break;
+            case 'matching_progress':
+                var pct = entry.total ? Math.round((entry.current / entry.total) * 100) : 0;
+                msg = '[' + (entry.current || 0) + '/' + (entry.total || 0) + '] ' +
+                      esc(entry.latest || '') + ' — score: ' + (entry.score || 0) +
+                      ' (' + esc(entry.verdict || '') + ') [' + pct + '%]';
+                break;
+            case 'matching_done':
+                msg = 'Matching finished — ' + (entry.matched || 0) + ' matched, ' +
+                      (entry.rejected || 0) + ' rejected out of ' + (entry.total || 0);
+                break;
+            case 'warn':
+                msg = esc(entry.message || '');
+                break;
+            default:
+                // Generic fallback
+                var parts = [];
+                for (var k in entry) {
+                    if (k === 'id' || k === 'ts' || k === 'event') continue;
+                    parts.push(k + '=' + entry[k]);
+                }
+                msg = parts.join(' | ');
+        }
+
+        return '<div class="console-line">' +
+            '<span class="console-ts">' + esc(ts) + '</span>' +
+            '<span class="console-event ' + esc(ev) + '">' + esc(ev) + '</span>' +
+            '<span class="console-msg">' + msg + '</span>' +
+            '</div>';
+    }
+
+    function pollConsoleLog() {
+        api('/api/live-log?after=' + consoleLastId).then(function(d) {
+            if (!d.entries || !d.entries.length) return;
+
+            var container = document.getElementById('consoleEntries');
+            if (!consoleHasEntries) {
+                container.innerHTML = '';
+                consoleHasEntries = true;
+            }
+
+            var html = '';
+            for (var i = 0; i < d.entries.length; i++) {
+                var entry = d.entries[i];
+                if (entry.id > consoleLastId) consoleLastId = entry.id;
+                html += formatConsoleEvent(entry);
+            }
+            container.insertAdjacentHTML('beforeend', html);
+
+            // Auto-scroll
+            if (document.getElementById('consoleAutoScroll').checked) {
+                container.scrollTop = container.scrollHeight;
+            }
+
+            // Update status line
+            var last = d.entries[d.entries.length - 1];
+            document.getElementById('consoleStatus').textContent =
+                last.event + ' — ' + new Date(last.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+            // Update dot
+            updateConsoleDot();
+        }).catch(function() {});
+    }
+
+    function updateConsoleDot() {
+        var dot = document.getElementById('consoleDot');
+        // Check if pipeline is active
+        api('/api/stats').then(function(stats) {
+            var p = stats.pipeline || {};
+            var active = (p.discovery && p.discovery.status === 'running') ||
+                         (p.matching && p.matching.status === 'running');
+            if (active) {
+                dot.classList.add('active');
+            } else {
+                dot.classList.remove('active');
+            }
+        }).catch(function() {});
+    }
+
+    function startConsolePoll() {
+        if (consolePollTimer) return;
+        pollConsoleLog();
+        consolePollTimer = setInterval(pollConsoleLog, 1000);
+    }
+
+    function stopConsolePoll() {
+        if (consolePollTimer) {
+            clearInterval(consolePollTimer);
+            consolePollTimer = null;
+        }
+    }
+
+    // Auto-open console and start polling when pipeline triggers
+    var origTrigger = window.triggerPipeline;
+    window.triggerPipeline = function(action) {
+        // Open console automatically when pipeline starts
+        if (!consoleOpen) {
+            toggleConsole();
+        }
+        origTrigger(action);
+    };
+
+    // ----------------------------------------------------------------
     // INIT & AUTO-REFRESH
     // ----------------------------------------------------------------
     function loadAll() {
@@ -755,8 +1431,12 @@
         loadActivity();
     }
 
+    loadAdapters();
     loadAll();
     setInterval(loadAll, 30000);
+
+    // Keep console dot in sync even when console is closed
+    setInterval(updateConsoleDot, 5000);
 })();
 </script>
 {% endblock %}

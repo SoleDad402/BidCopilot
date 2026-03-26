@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
+from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -21,6 +23,7 @@ from bidcopilot.core.models import (
     Job, JobStatus, Application, ApplicationStatus,
     DiscoveryRun, CareerSource,
 )
+from bidcopilot.discovery.base_adapter import AdapterRegistry
 from bidcopilot.discovery.engine import DiscoveryEngine
 from bidcopilot.matching.engine import MatchingEngine
 from bidcopilot.profile.manager import ProfileManager
@@ -40,6 +43,27 @@ _profile_manager = ProfileManager(_config.profile_path)
 _stats_cache: dict = {}
 _stats_cache_time: float = 0
 STATS_CACHE_TTL = 60  # seconds
+
+# --- Live log ring buffer ---
+_live_log: deque[dict] = deque(maxlen=200)
+_live_log_lock = threading.Lock()
+_live_log_counter = 0  # monotonic sequence id for polling
+
+def _append_log(event: str, data: dict):
+    """Thread-safe append to the live log."""
+    global _live_log_counter
+    with _live_log_lock:
+        _live_log_counter += 1
+        _live_log.append({
+            "id": _live_log_counter,
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "event": event,
+            **data,
+        })
+
+def _progress_callback(event: str, data: dict):
+    """Progress callback wired into DiscoveryEngine and MatchingEngine."""
+    _append_log(event, data)
 
 # --- Pipeline state ---
 _pipeline_state_file = Path("data/pipeline_state.json")
@@ -180,6 +204,34 @@ async def update_job_status(job_id: int, body: dict):
     return {"ok": True}
 
 
+@app.post("/api/jobs/clear")
+async def clear_jobs(body: dict):
+    """Delete jobs by scope: 'today', 'new', or 'all'."""
+    global _stats_cache_time
+    scope = body.get("scope", "")
+    if scope not in ("today", "new", "all"):
+        raise HTTPException(400, "scope must be 'today', 'new', or 'all'")
+
+    async with get_session() as session:
+        if scope == "today":
+            today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            stmt = select(Job).where(Job.discovered_at >= today)
+        elif scope == "new":
+            stmt = select(Job).where(Job.status == JobStatus.NEW.value)
+        else:  # all
+            stmt = select(Job)
+
+        result = await session.exec(stmt)
+        jobs = result.all()
+        count = len(jobs)
+        for job in jobs:
+            await session.delete(job)
+        await session.commit()
+
+    _stats_cache_time = 0
+    return {"ok": True, "deleted": count}
+
+
 # ───── Queue API ─────
 
 @app.get("/api/queue")
@@ -247,16 +299,57 @@ async def get_activity(limit: int = 20):
     }
 
 
+# ───── Adapters API ─────
+
+@app.get("/api/adapters")
+async def get_adapters():
+    """Return all registered adapters and which are enabled by default."""
+    all_adapters = AdapterRegistry.get_all()
+    enabled = set(_config.enabled_sites)
+    return {
+        "adapters": [
+            {
+                "name": name,
+                "requires_auth": cls.requires_auth,
+                "enabled": name in enabled,
+            }
+            for name, cls in sorted(all_adapters.items())
+        ]
+    }
+
+
+# ───── Live Log API ─────
+
+@app.get("/api/live-log")
+async def get_live_log(after: int = 0):
+    """Return log entries with id > after. Client polls with last seen id."""
+    with _live_log_lock:
+        entries = [e for e in _live_log if e["id"] > after]
+    return {"entries": entries}
+
+@app.post("/api/live-log/clear")
+async def clear_live_log():
+    """Clear the live log buffer."""
+    with _live_log_lock:
+        _live_log.clear()
+    return {"ok": True}
+
+
 # ───── Pipeline Control ─────
 
+# Track which sites were selected for the current discovery run
+_discovery_selected_sites: list[str] | None = None
+
 async def _run_discovery_task():
-    """Background task: run discovery on all enabled sites."""
+    """Background task: run discovery on selected sites."""
+    global _discovery_selected_sites
     state = _load_pipeline_state()
     state["discovery"] = {"status": "running", "started_at": datetime.utcnow().isoformat()}
     _save_pipeline_state(state)
     try:
         profile = _profile_manager.get()
-        engine = DiscoveryEngine(enabled_sites=_config.enabled_sites)
+        sites = _discovery_selected_sites or _config.enabled_sites
+        engine = DiscoveryEngine(enabled_sites=sites, on_progress=_progress_callback)
         result = await engine.run_all(profile)
         state["discovery"] = {
             "status": "idle",
@@ -269,6 +362,7 @@ async def _run_discovery_task():
         state["discovery"] = {"status": "error", "error": str(e)}
         logger.error("dashboard_discovery_failed", error=str(e))
     finally:
+        _discovery_selected_sites = None
         _save_pipeline_state(state)
         # Invalidate stats cache so next poll gets fresh data
         global _stats_cache_time
@@ -282,7 +376,8 @@ async def _run_matching_task():
     _save_pipeline_state(state)
     try:
         profile = _profile_manager.get()
-        engine = MatchingEngine(min_score=_config.matching.min_match_score)
+        engine = MatchingEngine(min_score=_config.matching.min_match_score,
+                                on_progress=_progress_callback)
         await engine.process_unscored_jobs(profile)
         state["matching"] = {
             "status": "idle",
@@ -299,12 +394,20 @@ async def _run_matching_task():
 
 
 @app.post("/api/pipeline/discover")
-async def trigger_discovery(background_tasks: BackgroundTasks):
+async def trigger_discovery(background_tasks: BackgroundTasks, body: dict | None = None):
+    global _discovery_selected_sites
     state = _load_pipeline_state()
     if state.get("discovery", {}).get("status") == "running":
         return {"ok": False, "message": "Discovery already running"}
+    # Accept optional list of sites to run
+    if body and body.get("sites"):
+        _discovery_selected_sites = body["sites"]
+        sites_label = ", ".join(body["sites"])
+    else:
+        _discovery_selected_sites = None
+        sites_label = "all enabled"
     background_tasks.add_task(_run_discovery_task)
-    return {"ok": True, "message": "Discovery started"}
+    return {"ok": True, "message": f"Discovery started ({sites_label})"}
 
 @app.post("/api/pipeline/match")
 async def trigger_matching(background_tasks: BackgroundTasks):

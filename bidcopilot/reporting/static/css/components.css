@@ -348,6 +348,24 @@
 
 /* ── TABLE ── */
 .table-wrap { overflow-x: auto; }
+
+/* Jobs card: fixed height with internal scroll so pagination stays pinned */
+.card-jobs {
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+}
+.card-jobs .table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 200px;
+}
+.card-jobs thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card, #1a1d23);
+    z-index: 5;
+}
 table { width: 100%; border-collapse: collapse; }
 thead th {
     font-size: 0.625rem;
@@ -409,6 +427,7 @@ tbody tr:last-child td { border-bottom: none; }
     gap: 8px;
     padding: 12px 16px;
     border-top: 1px solid var(--border);
+    flex-shrink: 0;
 }
 .pagination button {
     background: var(--bg-input);

@@ -486,23 +486,20 @@
                                 <input type="text" class="form-input" id="newWorkTitle" placeholder="Software Engineer">
                             </div>
                             <div class="form-group">
+                                <label class="form-label">Location</label>
+                                <input type="text" class="form-input" id="newWorkLocation" placeholder="Remote / San Francisco, CA">
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">Start Date</label>
                                 <input type="text" class="form-input" id="newWorkStart" placeholder="2020-01">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">End Date</label>
-                                <input type="text" class="form-input" id="newWorkEnd" placeholder="2023-06 or Present">
+                                <input type="text" class="form-input" id="newWorkEnd" placeholder="2023-06 (blank if current)">
                             </div>
-                            <div class="form-group full-width">
-                                <label class="form-label">Description</label>
-                                <textarea class="form-textarea" id="newWorkDesc" placeholder="Key responsibilities and achievements..."></textarea>
-                            </div>
-                            <div class="form-group full-width">
-                                <label class="form-label">Technologies</label>
-                                <div class="tag-input-container">
-                                    <div class="tag-list" id="newWorkTechsTags"></div>
-                                    <input type="text" class="tag-input-field" placeholder="Type a technology and press Enter..." onkeydown="handleTempTagInput(event, 'newWorkTechsTags')">
-                                </div>
+                            <div class="form-group" style="display:flex;align-items:center;gap:8px;padding-top:22px;">
+                                <input type="checkbox" id="newWorkCurrent" onchange="document.getElementById('newWorkEnd').disabled = this.checked; if(this.checked) document.getElementById('newWorkEnd').value = '';">
+                                <label class="form-label" for="newWorkCurrent" style="margin:0;">Current role</label>
                             </div>
                             <div class="form-group full-width" style="display:flex;flex-direction:row;justify-content:flex-end;">
                                 <button class="btn btn-primary" onclick="addWorkHistory()">Add Experience</button>
@@ -536,8 +533,9 @@
                     <thead>
                         <tr>
                             <th>Degree</th>
-                            <th>Institution</th>
-                            <th>Year</th>
+                            <th>School</th>
+                            <th>Field of Study</th>
+                            <th>Dates</th>
                             <th>GPA</th>
                             <th class="cell-actions"></th>
                         </tr>
@@ -546,20 +544,32 @@
                         <!-- populated by JS -->
                     </tbody>
                 </table>
-                <div class="inline-add-row">
-                    <div class="form-group" style="flex:2">
-                        <label class="form-label">Degree</label>
-                        <input type="text" class="form-input" id="newEduDegree" placeholder="B.S. Computer Science">
-                    </div>
-                    <div class="form-group" style="flex:2">
-                        <label class="form-label">Institution</label>
-                        <input type="text" class="form-input" id="newEduInstitution" placeholder="MIT">
+                <div class="inline-add-row" style="flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1.5">
+                        <label class="form-label">School Name</label>
+                        <input type="text" class="form-input" id="newEduSchool" placeholder="MIT">
                     </div>
                     <div class="form-group" style="flex:1">
-                        <label class="form-label">Year</label>
-                        <input type="number" class="form-input" id="newEduYear" placeholder="2020">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-input" id="newEduLocation" placeholder="Cambridge, MA">
+                    </div>
+                    <div class="form-group" style="flex:1.2">
+                        <label class="form-label">Degree</label>
+                        <input type="text" class="form-input" id="newEduDegree" placeholder="Bachelor of Science">
+                    </div>
+                    <div class="form-group" style="flex:1.2">
+                        <label class="form-label">Field of Study</label>
+                        <input type="text" class="form-input" id="newEduField" placeholder="Computer Science">
                     </div>
                     <div class="form-group" style="flex:0.8">
+                        <label class="form-label">Start Date</label>
+                        <input type="text" class="form-input" id="newEduStart" placeholder="2014-09">
+                    </div>
+                    <div class="form-group" style="flex:0.8">
+                        <label class="form-label">End Date</label>
+                        <input type="text" class="form-input" id="newEduEnd" placeholder="2018-05">
+                    </div>
+                    <div class="form-group" style="flex:0.5">
                         <label class="form-label">GPA</label>
                         <input type="text" class="form-input" id="newEduGpa" placeholder="3.8">
                     </div>
@@ -711,10 +721,6 @@
                     <div class="form-group">
                         <label class="form-label">Parallel Workers</label>
                         <input type="number" class="form-input" id="parallelWorkers" placeholder="3" min="1" max="20" data-field="application_settings.parallel_workers">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Base Resume Path</label>
-                        <input type="text" class="form-input" id="baseResumePath" placeholder="/path/to/resume.pdf" data-field="application_settings.base_resume_path">
                     </div>
                     <div class="form-group full-width">
                         <label class="form-label">Job Types</label>
@@ -1054,19 +1060,13 @@
                 <div class="work-entry-header">
                     <div>
                         <div class="work-entry-title">${BC.esc(entry.title || '')}</div>
-                        <div class="work-entry-company">${BC.esc(entry.company || '')}</div>
-                        <div class="work-entry-dates">${BC.esc(entry.start_date || '')} &mdash; ${BC.esc(entry.end_date || 'Present')}</div>
+                        <div class="work-entry-company">${BC.esc(entry.company || '')}${entry.location ? ' — ' + BC.esc(entry.location) : ''}</div>
+                        <div class="work-entry-dates">${BC.esc(entry.start_date || '')} &mdash; ${entry.is_current ? 'Present' : BC.esc(entry.end_date || 'Present')}</div>
                     </div>
                     <button class="btn btn-danger btn-icon" onclick="removeWorkHistory(${i})" title="Remove">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
-                ${entry.description ? `<div class="work-entry-desc">${BC.esc(entry.description)}</div>` : ''}
-                ${(entry.technologies && entry.technologies.length) ? `
-                    <div class="work-entry-techs">
-                        ${entry.technologies.map(t => `<span class="tech-tag">${BC.esc(t)}</span>`).join('')}
-                    </div>
-                ` : ''}
             </div>
         `).join('');
     }
@@ -1074,14 +1074,14 @@
     async function addWorkHistory() {
         const company = document.getElementById('newWorkCompany').value.trim();
         const title = document.getElementById('newWorkTitle').value.trim();
+        const location = document.getElementById('newWorkLocation').value.trim();
         const start_date = document.getElementById('newWorkStart').value.trim();
-        const end_date = document.getElementById('newWorkEnd').value.trim();
-        const description = document.getElementById('newWorkDesc').value.trim();
-        const technologies = tempTags['newWorkTechsTags'] ? [...tempTags['newWorkTechsTags']] : [];
+        const is_current = document.getElementById('newWorkCurrent').checked;
+        const end_date = is_current ? '' : document.getElementById('newWorkEnd').value.trim();
 
         if (!company || !title) { window.showToast('Company and title are required', 'error'); return; }
 
-        const entry = { company, title, start_date, end_date, description, technologies };
+        const entry = { company, title, location, start_date, end_date, is_current };
 
         try {
             const res = await fetch('/api/profile/work-history', {
@@ -1098,11 +1098,11 @@
             // Reset form
             document.getElementById('newWorkCompany').value = '';
             document.getElementById('newWorkTitle').value = '';
+            document.getElementById('newWorkLocation').value = '';
             document.getElementById('newWorkStart').value = '';
             document.getElementById('newWorkEnd').value = '';
-            document.getElementById('newWorkDesc').value = '';
-            tempTags['newWorkTechsTags'] = [];
-            renderTempTags('newWorkTechsTags');
+            document.getElementById('newWorkEnd').disabled = false;
+            document.getElementById('newWorkCurrent').checked = false;
             toggleAddForm('workAddPanel');
             window.showToast('Work experience added', 'success');
         } catch (e) {
@@ -1132,14 +1132,15 @@
         const tbody = document.getElementById('educationTableBody');
         const edu = profileData.education || [];
         if (edu.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:24px;font-size:0.8125rem;">No education added yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:24px;font-size:0.8125rem;">No education added yet</td></tr>';
             return;
         }
         tbody.innerHTML = edu.map((entry, i) => `
             <tr>
                 <td style="color:var(--text-primary);font-weight:500;">${BC.esc(entry.degree || '')}</td>
-                <td>${BC.esc(entry.institution || '')}</td>
-                <td class="num">${entry.year || '-'}</td>
+                <td>${BC.esc(entry.school_name || entry.institution || '')}</td>
+                <td>${BC.esc(entry.field_of_study || '')}</td>
+                <td class="num">${BC.esc(entry.start_date || '')}${entry.end_date ? ' - ' + BC.esc(entry.end_date) : ''}</td>
                 <td class="num">${entry.gpa || '-'}</td>
                 <td class="cell-actions">
                     <button class="btn btn-danger btn-icon" onclick="removeEducation(${i})" title="Remove">
@@ -1151,14 +1152,17 @@
     }
 
     async function addEducation() {
+        const school_name = document.getElementById('newEduSchool').value.trim();
+        const location = document.getElementById('newEduLocation').value.trim();
         const degree = document.getElementById('newEduDegree').value.trim();
-        const institution = document.getElementById('newEduInstitution').value.trim();
-        const year = parseInt(document.getElementById('newEduYear').value) || null;
-        const gpa = document.getElementById('newEduGpa').value.trim() || null;
+        const field_of_study = document.getElementById('newEduField').value.trim();
+        const start_date = document.getElementById('newEduStart').value.trim();
+        const end_date = document.getElementById('newEduEnd').value.trim();
+        const gpa = document.getElementById('newEduGpa').value.trim() || '';
 
-        if (!degree || !institution) { window.showToast('Degree and institution are required', 'error'); return; }
+        if (!school_name || !degree) { window.showToast('School name and degree are required', 'error'); return; }
 
-        const entry = { degree, institution, year, gpa };
+        const entry = { school_name, location, degree, field_of_study, start_date, end_date, gpa };
 
         try {
             const res = await fetch('/api/profile/education', {
@@ -1172,9 +1176,12 @@
             profileData.education.push(entry);
             renderEducation();
 
+            document.getElementById('newEduSchool').value = '';
+            document.getElementById('newEduLocation').value = '';
             document.getElementById('newEduDegree').value = '';
-            document.getElementById('newEduInstitution').value = '';
-            document.getElementById('newEduYear').value = '';
+            document.getElementById('newEduField').value = '';
+            document.getElementById('newEduStart').value = '';
+            document.getElementById('newEduEnd').value = '';
             document.getElementById('newEduGpa').value = '';
             window.showToast('Education added', 'success');
         } catch (e) {
