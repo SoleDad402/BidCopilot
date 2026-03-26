@@ -13,7 +13,8 @@
     /* ── Route map for nav highlighting ── */
     var NAV_MAP = {
         '/': 'dashboard',
-        '/profile': 'profile'
+        '/profile': 'profile',
+        '/admin': 'admin'
     };
 
     /* ── Intercept nav link clicks ── */

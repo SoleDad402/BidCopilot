@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import platform
 import threading
 import time
 from collections import deque
@@ -11,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, case, text
@@ -23,7 +25,7 @@ from bidcopilot.config import Config
 from bidcopilot.core.database import get_session, init_db
 from bidcopilot.core.models import (
     Job, JobStatus, Application, ApplicationStatus,
-    DiscoveryRun, CareerSource,
+    ApplicationEvent, DiscoveryRun, CareerSource, SiteCredential,
 )
 from bidcopilot.discovery.base_adapter import AdapterRegistry
 from bidcopilot.discovery.engine import DiscoveryEngine
@@ -160,6 +162,10 @@ async def dashboard_page(request: Request):
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
     return templates.TemplateResponse("profile.html", _template_ctx(request, active_page="profile"))
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request):
+    return templates.TemplateResponse("admin.html", _template_ctx(request, active_page="admin"))
 
 
 # ───── Stats API ─────
@@ -570,10 +576,412 @@ async def remove_education(index: int):
     return {"ok": True}
 
 
+# ───── Admin API ─────
+
+def _human_size(size_bytes: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
+
+
+def _human_uptime(seconds: float) -> str:
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
+    parts = []
+    if d:
+        parts.append(f"{d}d")
+    if h:
+        parts.append(f"{h}h")
+    parts.append(f"{m}m")
+    return " ".join(parts)
+
+
+def _mask_key(key: str | None) -> str | None:
+    if not key or len(key) < 8:
+        return None
+    return key[:4] + "..." + key[-4:]
+
+
+@app.get("/api/admin/system-health")
+async def admin_system_health():
+    # CVCopilot connectivity check
+    cv_reachable = False
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as http:
+            resp = await http.get(f"{_config.cvcopilot_url}/api/auth/verify")
+            cv_reachable = resp.status_code in (200, 401)  # 401 = reachable but no token
+    except Exception:
+        pass
+
+    db_path = Path(_config.db_path)
+    db_size = db_path.stat().st_size if db_path.exists() else 0
+
+    # Last discovery
+    last_disc = None
+    async with get_session() as session:
+        run = (await session.exec(
+            select(DiscoveryRun).order_by(DiscoveryRun.started_at.desc()).limit(1)
+        )).first()
+        if run:
+            last_disc = run.started_at.isoformat()
+
+    uptime = time.time() - _server_start_time if _server_start_time else 0
+
+    return {
+        "cvcopilot_url": _config.cvcopilot_url,
+        "cvcopilot_reachable": cv_reachable,
+        "db_path": _config.db_path,
+        "db_size_bytes": db_size,
+        "db_size_human": _human_size(db_size),
+        "last_discovery_time": last_disc,
+        "uptime_seconds": uptime,
+        "uptime_human": _human_uptime(uptime),
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+        "auth_enabled": _config.auth_enabled,
+    }
+
+
+@app.get("/api/admin/user-info")
+async def admin_user_info(request: Request):
+    user = _get_user(request)
+    token = _get_token(request)
+    return {
+        "user": user,
+        "auth_enabled": _config.auth_enabled,
+        "token_preview": _mask_key(token) if token else None,
+        "session_cookie": "bc_token",
+    }
+
+
+@app.get("/api/admin/api-keys")
+async def admin_api_keys():
+    keys = []
+    key_defs = [
+        ("OpenAI", "OPENAI_API_KEY"),
+        ("Reed.co.uk", "REED_API_KEY"),
+        ("LLM (config)", "BIDCOPILOT_LLM__API_KEY"),
+    ]
+    for name, env_var in key_defs:
+        val = os.environ.get(env_var)
+        if env_var == "BIDCOPILOT_LLM__API_KEY" and not val:
+            val = _config.llm.api_key
+        keys.append({
+            "name": name,
+            "env_var": env_var,
+            "is_set": bool(val),
+            "masked": _mask_key(val),
+        })
+    return {"keys": keys}
+
+
+@app.get("/api/admin/discovery-health")
+async def admin_discovery_health():
+    all_adapters = AdapterRegistry.get_all()
+    enabled = set(_config.enabled_sites)
+
+    async with get_session() as session:
+        # Aggregate stats per site
+        runs_all = (await session.exec(
+            select(DiscoveryRun).order_by(DiscoveryRun.started_at.desc())
+        )).all()
+
+    # Build per-site stats
+    site_stats: dict[str, dict] = {}
+    for r in runs_all:
+        s = site_stats.setdefault(r.site_name, {
+            "total_runs": 0, "successful_runs": 0, "failed_runs": 0,
+            "last_run_time": None, "last_run_status": None, "last_jobs_found": 0,
+        })
+        s["total_runs"] += 1
+        if r.status == "completed":
+            s["successful_runs"] += 1
+        elif r.status == "error":
+            s["failed_runs"] += 1
+        if s["last_run_time"] is None:
+            s["last_run_time"] = r.started_at.isoformat()
+            s["last_run_status"] = r.status
+            s["last_jobs_found"] = r.jobs_found
+
+    adapters = []
+    for name, cls in sorted(all_adapters.items()):
+        stats = site_stats.get(name, {})
+        total = stats.get("total_runs", 0)
+        adapters.append({
+            "name": name,
+            "enabled": name in enabled,
+            "requires_auth": cls.requires_auth,
+            "total_runs": total,
+            "successful_runs": stats.get("successful_runs", 0),
+            "failed_runs": stats.get("failed_runs", 0),
+            "last_run_time": stats.get("last_run_time"),
+            "last_run_status": stats.get("last_run_status"),
+            "last_jobs_found": stats.get("last_jobs_found", 0),
+            "error_rate": round(stats.get("failed_runs", 0) / total, 3) if total else 0,
+        })
+
+    recent = [
+        {"site": r.site_name, "started_at": r.started_at.isoformat(),
+         "status": r.status, "jobs_found": r.jobs_found, "jobs_new": r.jobs_new}
+        for r in runs_all[:50]
+    ]
+
+    return {"adapters": adapters, "recent_runs": recent}
+
+
+@app.get("/api/admin/logs")
+async def admin_logs(event_type: str | None = None, after: int = 0, limit: int = 100):
+    with _live_log_lock:
+        entries = [e for e in _live_log if e["id"] > after]
+    if event_type:
+        entries = [e for e in entries if event_type in e.get("event", "")]
+    return {"entries": entries[-limit:], "total": len(entries)}
+
+
+@app.get("/api/admin/config")
+async def admin_get_config():
+    all_adapters = AdapterRegistry.get_all()
+    return {
+        "enabled_sites": _config.enabled_sites,
+        "matching": {"min_match_score": _config.matching.min_match_score, "preferred_skills_boost": _config.matching.preferred_skills_boost},
+        "workers": {"max_workers": _config.workers.max_workers, "per_site_limit": _config.workers.per_site_limit, "max_applications_per_day": _config.workers.max_applications_per_day},
+        "llm": {"model": _config.llm.model, "fallback_model": _config.llm.fallback_model, "temperature": _config.llm.temperature, "max_tokens": _config.llm.max_tokens},
+        "notifications": {"enabled": _config.notifications.enabled, "channels": _config.notifications.channels},
+        "browser": {"headless": _config.browser.headless, "max_contexts": _config.browser.max_contexts},
+        "all_available_sites": sorted(all_adapters.keys()),
+    }
+
+
+@app.put("/api/admin/config")
+async def admin_update_config(body: dict):
+    if "enabled_sites" in body:
+        _config.enabled_sites = body["enabled_sites"]
+    if "matching" in body:
+        m = body["matching"]
+        if "min_match_score" in m:
+            _config.matching.min_match_score = int(m["min_match_score"])
+        if "preferred_skills_boost" in m:
+            _config.matching.preferred_skills_boost = int(m["preferred_skills_boost"])
+    if "workers" in body:
+        w = body["workers"]
+        if "max_workers" in w:
+            _config.workers.max_workers = int(w["max_workers"])
+        if "per_site_limit" in w:
+            _config.workers.per_site_limit = int(w["per_site_limit"])
+        if "max_applications_per_day" in w:
+            _config.workers.max_applications_per_day = int(w["max_applications_per_day"])
+    if "llm" in body:
+        l = body["llm"]
+        if "model" in l:
+            _config.llm.model = l["model"]
+        if "temperature" in l:
+            _config.llm.temperature = float(l["temperature"])
+        if "max_tokens" in l:
+            _config.llm.max_tokens = int(l["max_tokens"])
+    if "notifications" in body:
+        n = body["notifications"]
+        if "enabled" in n:
+            _config.notifications.enabled = bool(n["enabled"])
+
+    # Persist enabled_sites to settings.yaml
+    settings_path = Path(_config.settings_path)
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    import yaml
+    settings_data = {}
+    if settings_path.exists():
+        with open(settings_path) as f:
+            settings_data = yaml.safe_load(f) or {}
+    settings_data["enabled_sites"] = _config.enabled_sites
+    with open(settings_path, "w") as f:
+        yaml.dump(settings_data, f, default_flow_style=False)
+
+    return {"ok": True}
+
+
+@app.get("/api/admin/analytics")
+async def admin_analytics():
+    async with get_session() as session:
+        # Daily applications (last 30 days)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        apps = (await session.exec(
+            select(Application).where(Application.submitted_at >= thirty_days_ago)
+        )).all()
+        daily_apps: dict[str, int] = {}
+        for a in apps:
+            if a.submitted_at:
+                day = a.submitted_at.strftime("%Y-%m-%d")
+                daily_apps[day] = daily_apps.get(day, 0) + 1
+
+        # Daily discoveries (last 30 days)
+        jobs_recent = (await session.exec(
+            select(Job).where(Job.discovered_at >= thirty_days_ago)
+        )).all()
+        daily_disc: dict[str, int] = {}
+        for j in jobs_recent:
+            day = j.discovered_at.strftime("%Y-%m-%d")
+            daily_disc[day] = daily_disc.get(day, 0) + 1
+
+        # Score distribution
+        all_scored = (await session.exec(
+            select(Job).where(Job.match_score.is_not(None))
+        )).all()
+        score_ranges = {"90-100": 0, "80-89": 0, "70-79": 0, "60-69": 0, "0-59": 0}
+        for j in all_scored:
+            s = j.match_score
+            if s >= 90:
+                score_ranges["90-100"] += 1
+            elif s >= 80:
+                score_ranges["80-89"] += 1
+            elif s >= 70:
+                score_ranges["70-79"] += 1
+            elif s >= 60:
+                score_ranges["60-69"] += 1
+            else:
+                score_ranges["0-59"] += 1
+
+        # Jobs by status
+        result = await session.execute(
+            select(Job.status, func.count(Job.id)).group_by(Job.status)
+        )
+        jobs_by_status = [{"status": row[0], "count": row[1]} for row in result.all()]
+
+        # Jobs by source
+        result = await session.execute(
+            select(Job.site_name, func.count(Job.id)).group_by(Job.site_name).order_by(func.count(Job.id).desc())
+        )
+        jobs_by_source = [{"site": row[0], "count": row[1]} for row in result.all()]
+
+    return {
+        "daily_applications": [{"date": k, "count": v} for k, v in sorted(daily_apps.items())],
+        "daily_discoveries": [{"date": k, "count": v} for k, v in sorted(daily_disc.items())],
+        "score_distribution": [{"range": k, "count": v} for k, v in score_ranges.items()],
+        "jobs_by_status": jobs_by_status,
+        "jobs_by_source": jobs_by_source,
+    }
+
+
+@app.get("/api/admin/database")
+async def admin_database():
+    db_path = Path(_config.db_path)
+    db_size = db_path.stat().st_size if db_path.exists() else 0
+
+    table_counts = {}
+    async with get_session() as session:
+        for model in [Job, Application, ApplicationEvent, DiscoveryRun, CareerSource, SiteCredential]:
+            count = (await session.execute(select(func.count()).select_from(model))).scalar_one()
+            table_counts[model.__tablename__] = count
+
+    return {
+        "db_path": _config.db_path,
+        "db_size_bytes": db_size,
+        "db_size_human": _human_size(db_size),
+        "tables": [{"name": k, "row_count": v} for k, v in table_counts.items()],
+    }
+
+
+@app.post("/api/admin/database/vacuum")
+async def admin_database_vacuum():
+    db_path = Path(_config.db_path)
+    size_before = db_path.stat().st_size if db_path.exists() else 0
+    async with get_session() as session:
+        await session.execute(text("VACUUM"))
+        await session.commit()
+    size_after = db_path.stat().st_size if db_path.exists() else 0
+    return {
+        "ok": True,
+        "size_before": _human_size(size_before),
+        "size_after": _human_size(size_after),
+    }
+
+
+@app.get("/api/admin/database/export")
+async def admin_database_export():
+    db_path = Path(_config.db_path)
+    if not db_path.exists():
+        raise HTTPException(404, "Database file not found")
+    return FileResponse(
+        str(db_path),
+        media_type="application/octet-stream",
+        filename="bidcopilot.db",
+    )
+
+
+@app.get("/api/admin/credentials")
+async def admin_credentials():
+    async with get_session() as session:
+        creds = (await session.exec(select(SiteCredential))).all()
+    return {
+        "credentials": [
+            {
+                "id": c.id,
+                "site_name": c.site_name,
+                "username": c.username,
+                "has_totp": c.totp_secret_encrypted is not None,
+                "has_cookies": c.cookies_json_encrypted is not None,
+            }
+            for c in creds
+        ]
+    }
+
+
+@app.post("/api/admin/credentials")
+async def admin_add_credential(body: dict):
+    site_name = body.get("site_name", "").strip()
+    username = body.get("username", "").strip()
+    password = body.get("password", "")
+    if not site_name or not username or not password:
+        raise HTTPException(400, "site_name, username, and password required")
+
+    from bidcopilot.utils.crypto import encrypt_value
+    async with get_session() as session:
+        cred = SiteCredential(
+            site_name=site_name,
+            username=username,
+            password_encrypted=encrypt_value(password),
+        )
+        session.add(cred)
+        await session.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/credentials/{cred_id}")
+async def admin_delete_credential(cred_id: int):
+    async with get_session() as session:
+        cred = await session.get(SiteCredential, cred_id)
+        if not cred:
+            raise HTTPException(404, "Credential not found")
+        await session.delete(cred)
+        await session.commit()
+    return {"ok": True}
+
+
+@app.get("/api/admin/scheduler")
+async def admin_scheduler():
+    pipeline = _load_pipeline_state()
+    return {
+        "pipeline_state": pipeline,
+        "schedule": {
+            "discovery": {"trigger": "interval", "interval_hours": 4},
+            "matching": {"trigger": "interval", "interval_minutes": 15},
+            "application": {"trigger": "interval", "interval_minutes": 30},
+        },
+        "note": "Scheduler runs via 'bidcopilot run'. In dashboard-only mode, use manual triggers.",
+    }
+
+
 # ───── Startup ─────
+
+_server_start_time: float = 0
+
 
 @app.on_event("startup")
 async def startup():
+    global _server_start_time
+    _server_start_time = time.time()
     await init_db(_config.db_path)
     # Reset stale "running" states from previous crashes
     state = _load_pipeline_state()

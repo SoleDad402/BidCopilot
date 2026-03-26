@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - BidCopilot Command Center{% endblock %}
+
+{% block head_extra_inner %}
+    .main-content {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 32px 24px 80px;
+    }
+    .page-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 4px; }
+    .page-subtitle { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 32px; }
+
+    /* Section cards (reuse profile pattern) */
+    .section-card { background: var(--bg-card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden; transition: border-color var(--transition-fast); }
+    .section-card:hover { border-color: var(--border); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; cursor: pointer; user-select: none; transition: background var(--transition-fast); }
+    .section-header:hover { background: rgba(255,255,255,0.02); }
+    .section-header-left { display: flex; align-items: center; gap: 12px; }
+    .section-icon { width: 32px; height: 32px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .section-icon.health { background: var(--success-subtle); color: var(--success); }
+    .section-icon.user { background: var(--blue-subtle); color: var(--blue); }
+    .section-icon.keys { background: var(--warning-subtle); color: var(--warning); }
+    .section-icon.discovery { background: var(--purple-subtle); color: var(--purple); }
+    .section-icon.logs { background: var(--cyan-subtle); color: var(--cyan); }
+    .section-icon.config { background: var(--orange-subtle); color: var(--orange); }
+    .section-icon.analytics { background: var(--accent-subtle); color: var(--accent); }
+    .section-icon.database { background: var(--violet-subtle); color: var(--violet); }
+    .section-icon.credentials { background: var(--blue-subtle); color: var(--blue); }
+    .section-icon.scheduler { background: var(--cyan-subtle); color: var(--cyan); }
+    .section-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; }
+    .section-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+    .section-chevron { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); transition: transform var(--transition-normal); flex-shrink: 0; }
+    .section-card.collapsed .section-chevron { transform: rotate(-90deg); }
+    .section-body { max-height: 3000px; overflow: hidden; transition: max-height 0.35s ease, opacity 0.25s ease; opacity: 1; }
+    .section-card.collapsed .section-body { max-height: 0; opacity: 0; }
+    .section-inner { padding: 0 24px 24px; border-top: 1px solid var(--border-subtle); }
+
+    /* Info rows */
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; padding-top: 16px; }
+    .info-item { padding: 12px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius); }
+    .info-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .info-value { font-size: 0.875rem; color: var(--text-primary); font-weight: 500; word-break: break-all; }
+    .info-value.success { color: var(--success); }
+    .info-value.error { color: var(--error); }
+    .info-value.warning { color: var(--warning); }
+
+    /* Status dot */
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .status-pill.ok { background: var(--success-subtle); color: var(--success); }
+    .status-pill.fail { background: var(--error-subtle); color: var(--error); }
+    .status-pill.warn { background: var(--warning-subtle); color: var(--warning); }
+
+    /* Adapter table */
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.8125rem; }
+    .admin-table th { text-align: left; font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); }
+    .admin-table td { padding: 10px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .admin-table .name { color: var(--text-primary); font-weight: 500; }
+    .admin-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Bar chart */
+    .bar-chart { padding-top: 16px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .bar-label { width: 80px; font-size: 0.75rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.03); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; min-width: 2px; }
+    .bar-count { width: 40px; font-size: 0.75rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+    /* Logs */
+    .log-list { max-height: 400px; overflow-y: auto; padding-top: 12px; }
+    .log-entry { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 0.8125rem; font-family: 'SF Mono', 'Consolas', monospace; display: flex; gap: 10px; }
+    .log-entry .log-time { color: var(--text-dim); flex-shrink: 0; font-size: 0.75rem; }
+    .log-entry .log-event { color: var(--text-secondary); }
+    .log-entry.error .log-event { color: var(--error); }
+    .log-empty { text-align: center; color: var(--text-dim); padding: 32px; font-size: 0.8125rem; }
+
+    /* Config form */
+    .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding-top: 16px; }
+    .config-group label { display: block; font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .config-group input, .config-group select { width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius); color: var(--text-primary); font-size: 0.8125rem; font-family: inherit; outline: none; box-sizing: border-box; }
+    .config-group input:focus, .config-group select:focus { border-color: var(--border-focus); }
+
+    /* Site toggles */
+    .site-toggle-grid { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+    .site-toggle { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius); font-size: 0.8125rem; cursor: pointer; transition: all 0.2s; }
+    .site-toggle.active { background: var(--success-subtle); border-color: rgba(52,211,153,0.3); color: var(--success); }
+    .site-toggle input { display: none; }
+
+    /* Action buttons */
+    .admin-actions { display: flex; gap: 8px; padding-top: 16px; flex-wrap: wrap; }
+    .btn-admin { padding: 8px 16px; font-size: 0.8125rem; font-weight: 600; border-radius: var(--radius); border: 1px solid var(--border-subtle); background: rgba(255,255,255,0.04); color: var(--text-secondary); cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .btn-admin:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .btn-admin.primary { background: var(--accent-subtle); border-color: rgba(233,69,96,0.3); color: var(--accent); }
+    .btn-admin.primary:hover { background: var(--accent); color: #fff; }
+    .btn-admin.danger { background: var(--error-subtle); border-color: rgba(248,113,113,0.25); color: var(--error); }
+
+    /* Credential row */
+    .cred-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius); margin-top: 8px; }
+    .cred-info { font-size: 0.8125rem; }
+    .cred-site { color: var(--text-primary); font-weight: 500; }
+    .cred-user { color: var(--text-muted); margin-left: 8px; }
+
+    @media (max-width: 640px) {
+        .main-content { padding: 20px 16px 80px; }
+        .info-grid { grid-template-columns: 1fr; }
+        .config-grid { grid-template-columns: 1fr; }
+    }
+{% endblock %}
+
+{% block body %}
+<div class="page-content">
+<main class="main-content">
+    <h1 class="page-title">System Administration</h1>
+    <p class="page-subtitle">Monitor health, manage configuration, and view analytics.</p>
+
+    <!-- 1. System Health -->
+    <div class="section-card" data-section="system-health">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon health">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                <div><div class="section-title">System Health</div><div class="section-desc">API connectivity, uptime, platform info</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="systemHealthContent"><div class="info-grid"><div class="info-item"><div class="skeleton skeleton-block" style="height:12px;width:60%"></div></div><div class="info-item"><div class="skeleton skeleton-block" style="height:12px;width:40%"></div></div><div class="info-item"><div class="skeleton skeleton-block" style="height:12px;width:50%"></div></div></div></div></div>
+    </div>
+
+    <!-- 2. User Info -->
+    <div class="section-card collapsed" data-section="user-info">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon user">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div><div class="section-title">User & Session</div><div class="section-desc">Current user details and session info</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="userInfoContent"></div></div>
+    </div>
+
+    <!-- 3. API Keys -->
+    <div class="section-card collapsed" data-section="api-keys">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon keys">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78z"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
+                </div>
+                <div><div class="section-title">API Keys</div><div class="section-desc">External service key status</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="apiKeysContent"></div></div>
+    </div>
+
+    <!-- 4. Discovery Monitoring -->
+    <div class="section-card collapsed" data-section="discovery">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon discovery">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <div><div class="section-title">Discovery Monitoring</div><div class="section-desc">Adapter health, success rates, crawl history</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="discoveryContent"></div></div>
+    </div>
+
+    <!-- 5. Application Logs -->
+    <div class="section-card collapsed" data-section="logs">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon logs">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <div><div class="section-title">Application Logs</div><div class="section-desc">Recent pipeline activity and errors</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="logsContent"></div></div>
+    </div>
+
+    <!-- 6. Configuration -->
+    <div class="section-card collapsed" data-section="config">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon config">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+                <div><div class="section-title">Configuration</div><div class="section-desc">Sites, matching, workers, LLM settings</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="configContent"></div></div>
+    </div>
+
+    <!-- 7. Usage Analytics -->
+    <div class="section-card collapsed" data-section="analytics">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon analytics">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                </div>
+                <div><div class="section-title">Usage Analytics</div><div class="section-desc">Discovery trends, match scores, source breakdown</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="analyticsContent"></div></div>
+    </div>
+
+    <!-- 8. Database -->
+    <div class="section-card collapsed" data-section="database">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon database">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                </div>
+                <div><div class="section-title">Database</div><div class="section-desc">Table sizes, storage, maintenance</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="databaseContent"></div></div>
+    </div>
+
+    <!-- 9. Site Credentials -->
+    <div class="section-card collapsed" data-section="credentials">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon credentials">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <div><div class="section-title">Site Credentials</div><div class="section-desc">Stored login credentials for job boards</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="credentialsContent"></div></div>
+    </div>
+
+    <!-- 10. Scheduler -->
+    <div class="section-card collapsed" data-section="scheduler">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon scheduler">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div><div class="section-title">Scheduler</div><div class="section-desc">Pipeline schedule and run status</div></div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body"><div class="section-inner" id="schedulerContent"></div></div>
+    </div>
+
+</main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin.js"></script>
+{% endblock %}
