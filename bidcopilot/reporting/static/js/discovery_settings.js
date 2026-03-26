@@ -328,8 +328,37 @@
         }
     });
 
+    // ── Save bar portal (move to body to escape #page-content transform) ──
+    function mountSaveBar() {
+        var source = document.getElementById('discoverySaveBarSource');
+        if (!source) return;
+        var bar = document.getElementById('discoverySaveBar');
+        if (bar) {
+            document.body.appendChild(bar);
+            bar.style.display = '';
+        }
+    }
+
+    function unmountSaveBar() {
+        var bar = document.getElementById('discoverySaveBar');
+        if (bar && bar.parentElement === document.body) {
+            bar.remove();
+        }
+    }
+
+    // Clean up on SPA navigation
+    window.addEventListener('beforeunload', unmountSaveBar);
+    // Also clean up when router navigates away
+    var _origPushState = history.pushState;
+    history.pushState = function () {
+        unmountSaveBar();
+        return _origPushState.apply(this, arguments);
+    };
+    window.addEventListener('popstate', unmountSaveBar);
+
     // ── Init ──
     restoreCollapse();
+    mountSaveBar();
     loadConfig();
 
 })();

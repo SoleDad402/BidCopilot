@@ -61,8 +61,9 @@
     .adapter-config-badge.enabled { background: var(--success-subtle); color: var(--success); }
     .adapter-config-badge.disabled { background: rgba(255,255,255,0.04); color: var(--text-dim); }
 
-    /* Save bar */
-    .save-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 150; background: var(--glass-bg); backdrop-filter: var(--blur-heavy); -webkit-backdrop-filter: var(--blur-heavy); border-top: 1px solid var(--glass-border); padding: 14px 2rem; display: flex; justify-content: center; }
+    /* Save bar — uses sticky on a wrapper to avoid transform breaking fixed */
+    .save-bar-wrapper { position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999; pointer-events: none; }
+    .save-bar { pointer-events: auto; background: rgba(10, 14, 26, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 2rem; display: flex; justify-content: center; }
     .save-bar-inner { display: flex; align-items: center; gap: 16px; max-width: 960px; width: 100%; justify-content: flex-end; }
     .unsaved-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--text-muted); opacity: 0; transition: opacity 0.3s; }
     .unsaved-indicator.visible { opacity: 1; }
@@ -127,14 +128,18 @@
 </main>
 </div>
 
-<!-- Save bar -->
-<div class="save-bar">
-    <div class="save-bar-inner">
-        <div class="unsaved-indicator" id="unsavedIndicator">
-            <div class="unsaved-dot"></div>
-            <span>Unsaved changes</span>
+<!-- Save bar — moved to body by JS to escape #page-content transform -->
+<div id="discoverySaveBarSource" style="display:none">
+    <div class="save-bar-wrapper" id="discoverySaveBar">
+        <div class="save-bar">
+            <div class="save-bar-inner">
+                <div class="unsaved-indicator" id="unsavedIndicator">
+                    <div class="unsaved-dot"></div>
+                    <span>Unsaved changes</span>
+                </div>
+                <button class="btn-save" id="saveBtn" onclick="window.discoverySave()">Save Settings</button>
+            </div>
         </div>
-        <button class="btn-save" id="saveBtn" onclick="window.discoverySave()">Save Settings</button>
     </div>
 </div>
 {% endblock %}
