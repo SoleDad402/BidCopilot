@@ -50,6 +50,7 @@ class Config(BaseSettings):
     settings_path: str = "config/settings.yaml"
     cvcopilot_url: str = "https://cvcopilot-production.up.railway.app"
     auth_enabled: bool = True
+    discovery_config_path: str = "config/discovery.yaml"
     enabled_sites: list[str] = Field(
         default_factory=lambda: [
             # Tier 1: Free public API adapters

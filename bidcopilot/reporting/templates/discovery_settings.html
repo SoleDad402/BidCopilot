@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Discovery Settings - BidCopilot Command Center{% endblock %}
+
+{% block head_extra_inner %}
+    .main-content { max-width: 960px; margin: 0 auto; padding: 32px 24px 120px; }
+    .page-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 4px; }
+    .page-subtitle { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 32px; }
+
+    /* Section cards */
+    .section-card { background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden; transition: border-color var(--transition-fast); }
+    .section-card:hover { border-color: var(--border); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; cursor: pointer; user-select: none; }
+    .section-header:hover { background: rgba(255,255,255,0.02); }
+    .section-header-left { display: flex; align-items: center; gap: 12px; }
+    .section-icon { width: 32px; height: 32px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .section-icon.global { background: var(--accent-subtle); color: var(--accent); }
+    .section-icon.adapter { background: var(--purple-subtle); color: var(--purple); }
+    .section-title { font-size: 0.9375rem; font-weight: 600; }
+    .section-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+    .section-chevron { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); transition: transform 0.3s; flex-shrink: 0; }
+    .section-card.collapsed .section-chevron { transform: rotate(-90deg); }
+    .section-body { max-height: 5000px; overflow: hidden; transition: max-height 0.35s ease, opacity 0.25s ease; opacity: 1; }
+    .section-card.collapsed .section-body { max-height: 0; opacity: 0; }
+    .section-inner { padding: 0 24px 24px; border-top: 1px solid var(--border-subtle); }
+
+    /* Form */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding-top: 16px; }
+    .form-group { }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-label { display: block; font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .form-input, .form-select { width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius); color: var(--text-primary); font-size: 0.8125rem; font-family: inherit; outline: none; box-sizing: border-box; }
+    .form-input:focus, .form-select:focus { border-color: var(--border-focus); }
+
+    /* Tag inputs */
+    .tag-input-container { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius); min-height: 38px; align-items: center; }
+    .tag-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: var(--blue-subtle); color: var(--blue); border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+    .tag-remove { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.875rem; padding: 0 2px; opacity: 0.7; }
+    .tag-remove:hover { opacity: 1; }
+    .tag-input-field { background: transparent; border: none; color: var(--text-primary); font-size: 0.8125rem; outline: none; flex: 1; min-width: 100px; font-family: inherit; }
+
+    /* Checkbox grid for categories */
+    .checkbox-grid { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
+    .checkbox-label { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius); font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+    .checkbox-label:hover { background: rgba(255,255,255,0.04); }
+    .checkbox-label.checked { background: var(--purple-subtle); border-color: rgba(139,92,246,0.3); color: var(--purple); }
+    .checkbox-label input { display: none; }
+
+    /* Seniority + job type chips */
+    .chip-grid { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+    .chip { padding: 5px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 16px; font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; user-select: none; }
+    .chip.active { background: var(--accent-subtle); border-color: rgba(233,69,96,0.3); color: var(--accent); }
+    .chip:hover { border-color: var(--border); }
+
+    /* Adapter card */
+    .adapter-config-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 16px; margin-top: 12px; }
+    .adapter-config-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .adapter-config-name { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+    .adapter-config-badge { font-size: 0.625rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+    .adapter-config-badge.auth { background: var(--warning-subtle); color: var(--warning); }
+    .adapter-config-badge.enabled { background: var(--success-subtle); color: var(--success); }
+    .adapter-config-badge.disabled { background: rgba(255,255,255,0.04); color: var(--text-dim); }
+
+    /* Save bar */
+    .save-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 150; background: var(--glass-bg); backdrop-filter: var(--blur-heavy); -webkit-backdrop-filter: var(--blur-heavy); border-top: 1px solid var(--glass-border); padding: 14px 2rem; display: flex; justify-content: center; }
+    .save-bar-inner { display: flex; align-items: center; gap: 16px; max-width: 960px; width: 100%; justify-content: flex-end; }
+    .unsaved-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--text-muted); opacity: 0; transition: opacity 0.3s; }
+    .unsaved-indicator.visible { opacity: 1; }
+    .unsaved-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }
+    .btn-save { padding: 10px 28px; font-size: 0.875rem; font-weight: 600; border-radius: var(--radius); background: var(--accent); color: #fff; border: none; cursor: pointer; font-family: inherit; }
+    .btn-save:hover { background: var(--accent-hover); }
+
+    @media (max-width: 640px) {
+        .main-content { padding: 20px 16px 120px; }
+        .form-grid { grid-template-columns: 1fr; }
+    }
+{% endblock %}
+
+{% block body %}
+<div class="page-content">
+<main class="main-content">
+    <h1 class="page-title">Discovery Settings</h1>
+    <p class="page-subtitle">Configure search parameters globally and per job platform.</p>
+
+    <!-- Global Settings -->
+    <div class="section-card" data-section="global">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon global">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Global Settings</div>
+                    <div class="section-desc">Default parameters applied to all adapters</div>
+                </div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner" id="globalSettingsContent">
+                <!-- populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-Adapter Settings -->
+    <div class="section-card" data-section="adapters">
+        <div class="section-header" onclick="toggleSection(this)">
+            <div class="section-header-left">
+                <div class="section-icon adapter">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <div>
+                    <div class="section-title">Platform Configuration</div>
+                    <div class="section-desc">Per-adapter categories, keywords, and limits</div>
+                </div>
+            </div>
+            <div class="section-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+        </div>
+        <div class="section-body">
+            <div class="section-inner" id="adapterSettingsContent">
+                <!-- populated by JS -->
+            </div>
+        </div>
+    </div>
+
+</main>
+</div>
+
+<!-- Save bar -->
+<div class="save-bar">
+    <div class="save-bar-inner">
+        <div class="unsaved-indicator" id="unsavedIndicator">
+            <div class="unsaved-dot"></div>
+            <span>Unsaved changes</span>
+        </div>
+        <button class="btn-save" id="saveBtn" onclick="window.discoverySave()">Save Settings</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/discovery_settings.js"></script>
+{% endblock %}

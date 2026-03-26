@@ -4,7 +4,7 @@ import random
 import asyncio
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import AsyncIterator
+from typing import AsyncIterator, ClassVar
 from pydantic import BaseModel, Field
 
 class RateLimitConfig(BaseModel):
@@ -23,6 +23,13 @@ class SearchParams(BaseModel):
     posted_within_days: int = 7
     salary_min: int | None = None
     excluded_companies: list[str] = Field(default_factory=list)
+    # Configurable discovery settings (resolved per-adapter by engine)
+    seniority_levels: list[str] = Field(default_factory=list)
+    experience_years_min: int | None = None
+    experience_years_max: int | None = None
+    categories: list[str] = Field(default_factory=list)
+    max_pages: int = 5
+    max_results: int = 100
 
 class RawJobListing(BaseModel):
     external_id: str
@@ -52,6 +59,11 @@ class BaseJobSiteAdapter(ABC):
     site_name: str = "unknown"
     requires_auth: bool = False
     rate_limit: RateLimitConfig = RateLimitConfig()
+    # Adapter metadata — set by subclasses for UI/config display
+    supported_categories: ClassVar[list[str]] = []
+    default_categories: ClassVar[list[str]] = []
+    supports_seniority_filter: ClassVar[bool] = False
+    supports_salary_filter: ClassVar[bool] = False
 
     @abstractmethod
     async def authenticate(self, ctx) -> None: ...

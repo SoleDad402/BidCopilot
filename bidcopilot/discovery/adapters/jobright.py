@@ -21,13 +21,6 @@ logger = get_logger(__name__)
 
 BASE_URL = "https://jobright.ai/remote-jobs"
 
-# Categories relevant to software engineering
-TECH_CATEGORIES = [
-    "software-engineering",
-    "data-ai",
-    "infrastructure-security",
-]
-
 # Work model values: 1 = onsite, 2 = hybrid, 3 = remote
 WORK_MODEL_REMOTE = 3
 WORK_MODEL_HYBRID = 2
@@ -114,6 +107,12 @@ class JobrightAdapter(BaseJobSiteAdapter):
         delay_between_pages=(2, 5),
         delay_between_actions=(0.5, 1.5),
     )
+    supported_categories: list[str] = [
+        "software-engineering", "data-ai", "infrastructure-security", "design",
+        "product-management", "marketing", "sales", "finance", "hr", "legal",
+        "operations",
+    ]
+    default_categories: list[str] = ["software-engineering", "data-ai", "infrastructure-security"]
 
     async def _get_build_id(self, client: httpx.AsyncClient) -> str | None:
         """Extract the Next.js buildId from the remote-jobs page."""
@@ -141,7 +140,8 @@ class JobrightAdapter(BaseJobSiteAdapter):
 
             excluded_lower = {c.lower() for c in params.excluded_companies}
 
-            for category in TECH_CATEGORIES:
+            categories = params.categories or self.default_categories
+            for category in categories:
                 try:
                     url = f"{BASE_URL}/_next/data/{build_id}/{category}.json"
                     resp = await client.get(

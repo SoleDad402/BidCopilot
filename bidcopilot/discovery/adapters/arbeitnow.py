@@ -24,10 +24,12 @@ class ArbeitnowAdapter(BaseJobSiteAdapter):
     site_name = "arbeitnow"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=10, delay_between_pages=(2, 5))
+    supported_categories: list[str] = []
+    default_categories: list[str] = []
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
         page = 1
-        max_pages = 10  # Arbeitnow has 100 jobs/page, scan deeper for tech matches
+        max_pages = params.max_pages or 10  # Arbeitnow has 100 jobs/page, scan deeper for tech matches
 
         async with httpx.AsyncClient(timeout=30) as client:
             for _ in range(max_pages):

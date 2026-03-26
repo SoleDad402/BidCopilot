@@ -7,6 +7,7 @@ from sqlmodel import select
 from bidcopilot.core.database import get_session
 from bidcopilot.core.models import Job, JobStatus, DiscoveryRun, CareerSource
 from bidcopilot.discovery.base_adapter import AdapterRegistry, SearchParams, BaseJobSiteAdapter
+from bidcopilot.discovery.config import DiscoveryConfig, DiscoveryConfigManager
 import bidcopilot.discovery.adapters  # noqa: F401 — trigger adapter registration
 from bidcopilot.profile.schemas import UserProfile
 from bidcopilot.utils.logging import get_logger
@@ -22,19 +23,57 @@ def _noop_progress(event: str, data: dict) -> None:
 
 class DiscoveryEngine:
     def __init__(self, enabled_sites: list[str] | None = None,
-                 on_progress: ProgressCallback | None = None):
+                 on_progress: ProgressCallback | None = None,
+                 discovery_config: DiscoveryConfig | None = None,
+                 discovery_config_path: str = "config/discovery.yaml"):
         self.enabled_sites = enabled_sites or []
         self._progress = on_progress or _noop_progress
+        self._discovery_config = discovery_config
+        self._discovery_config_path = discovery_config_path
+
+    def _load_config(self) -> DiscoveryConfig:
+        if self._discovery_config:
+            return self._discovery_config
+        return DiscoveryConfigManager(self._discovery_config_path).load()
+
+    def _build_base_params(self, profile: UserProfile, config: DiscoveryConfig) -> SearchParams:
+        """Build base SearchParams from profile + global discovery settings."""
+        g = config.global_settings
+        return SearchParams(
+            keywords=g.keywords or profile.get_search_keywords(),
+            locations=profile.locations_preferred,
+            remote_only=(g.remote_preference or profile.remote_preference) == "remote_only",
+            job_types=g.job_types or profile.job_types,
+            salary_min=g.salary_floor or profile.min_salary,
+            excluded_companies=g.excluded_companies or profile.companies_excluded,
+            posted_within_days=g.posted_within_days,
+            seniority_levels=g.seniority_levels,
+            experience_years_min=g.experience_years_min,
+            experience_years_max=g.experience_years_max,
+            max_results=g.max_results_per_adapter,
+            max_pages=g.max_pages_default,
+        )
+
+    def _resolve_for_adapter(self, base: SearchParams, adapter: BaseJobSiteAdapter,
+                             config: DiscoveryConfig) -> SearchParams:
+        """Clone base params and apply per-adapter overrides."""
+        override = config.adapters.get(adapter.site_name)
+        if not override:
+            return base.model_copy(update={"categories": adapter.default_categories})
+
+        updates: dict = {"categories": override.categories or adapter.default_categories}
+        if override.keywords:
+            updates["keywords"] = override.keywords
+        if override.max_pages is not None:
+            updates["max_pages"] = override.max_pages
+        if override.max_results is not None:
+            updates["max_results"] = override.max_results
+
+        return base.model_copy(update=updates)
 
     async def run_all(self, profile: UserProfile, browser_ctx=None) -> dict:
-        params = SearchParams(
-            keywords=profile.get_search_keywords(),
-            locations=profile.locations_preferred,
-            remote_only=profile.remote_preference == "remote_only",
-            job_types=profile.job_types,
-            salary_min=profile.min_salary,
-            excluded_companies=profile.companies_excluded,
-        )
+        config = self._load_config()
+        base_params = self._build_base_params(profile, config)
         adapters = AdapterRegistry.get_enabled(self.enabled_sites)
         if not adapters:
             logger.warning("no_adapters_enabled")
@@ -53,10 +92,11 @@ class DiscoveryEngine:
 
         async def run_adapter(adapter):
             async with sem:
+                adapter_params = self._resolve_for_adapter(base_params, adapter, config)
                 self._progress("adapter_start", {"adapter": adapter.site_name})
                 try:
                     r = await asyncio.wait_for(
-                        self._run_single(adapter, params, browser_ctx), timeout=600
+                        self._run_single(adapter, adapter_params, browser_ctx), timeout=600
                     )
                     results[adapter.site_name] = r
                     self._progress("adapter_done", {
@@ -97,15 +137,10 @@ class DiscoveryEngine:
         adapters = AdapterRegistry.get_enabled([site_name])
         if not adapters:
             return {"error": f"Adapter '{site_name}' not found"}
-        params = SearchParams(
-            keywords=profile.get_search_keywords(),
-            locations=profile.locations_preferred,
-            remote_only=profile.remote_preference == "remote_only",
-            job_types=profile.job_types,
-            salary_min=profile.min_salary,
-            excluded_companies=profile.companies_excluded,
-        )
-        return await self._run_single(adapters[0], params, browser_ctx)
+        config = self._load_config()
+        base_params = self._build_base_params(profile, config)
+        adapter_params = self._resolve_for_adapter(base_params, adapters[0], config)
+        return await self._run_single(adapters[0], adapter_params, browser_ctx)
 
     async def _run_single(self, adapter: BaseJobSiteAdapter, params: SearchParams, ctx) -> dict:
         run = DiscoveryRun(site_name=adapter.site_name, started_at=datetime.utcnow())

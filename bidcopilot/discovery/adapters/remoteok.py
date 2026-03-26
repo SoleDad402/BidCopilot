@@ -18,6 +18,8 @@ class RemoteOKAdapter(BaseJobSiteAdapter):
     site_name = "remoteok"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=10, delay_between_pages=(2, 5))
+    supported_categories: list[str] = []
+    default_categories: list[str] = []
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
         async with httpx.AsyncClient() as client:

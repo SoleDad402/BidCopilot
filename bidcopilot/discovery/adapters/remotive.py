@@ -18,24 +18,21 @@ logger = get_logger(__name__)
 
 API_URL = "https://remotive.com/api/remote-jobs"
 
-# Remotive category slugs that map to software engineering
-TECH_CATEGORIES = [
-    "software-dev",
-    "data",
-    "devops",
-    "qa",
-]
-
-
 @AdapterRegistry.register
 class RemotiveAdapter(BaseJobSiteAdapter):
     site_name = "remotive"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=10, delay_between_pages=(2, 5))
+    supported_categories: list[str] = [
+        "software-dev", "data", "devops", "qa", "design", "product",
+        "marketing", "customer-support", "sales", "finance", "hr", "writing",
+    ]
+    default_categories: list[str] = ["software-dev", "data", "devops", "qa"]
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
+        categories = params.categories or self.default_categories
         async with httpx.AsyncClient(timeout=30) as client:
-            for category in TECH_CATEGORIES:
+            for category in categories:
                 try:
                     resp = await client.get(
                         API_URL,

@@ -19,6 +19,8 @@ class HNHiringAdapter(BaseJobSiteAdapter):
     site_name = "hn_hiring"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=30, delay_between_pages=(0.5, 1.5))
+    supported_categories: list[str] = []
+    default_categories: list[str] = []
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
         async with httpx.AsyncClient() as client:

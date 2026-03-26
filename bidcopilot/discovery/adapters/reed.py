@@ -29,6 +29,8 @@ class ReedAdapter(BaseJobSiteAdapter):
     site_name = "reed"
     requires_auth = True  # needs free API key
     rate_limit = RateLimitConfig(requests_per_minute=15, delay_between_pages=(1, 3))
+    supported_categories: list[str] = []
+    default_categories: list[str] = []
 
     def _get_api_key(self) -> str | None:
         return os.environ.get("REED_API_KEY")
@@ -49,7 +51,7 @@ class ReedAdapter(BaseJobSiteAdapter):
         async with httpx.AsyncClient(timeout=30) as client:
             for keyword in params.keywords[:3]:  # limit to 3 keyword searches
                 results_to_skip = 0
-                max_pages = 3
+                max_pages = params.max_pages or 3
 
                 for page in range(max_pages):
                     try:

@@ -18,6 +18,8 @@ class WorkdayAdapter(BaseJobSiteAdapter):
     site_name = "workday"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=5, delay_between_pages=(3, 7))
+    supported_categories: list[str] = []
+    default_categories: list[str] = []
 
     def __init__(self):
         self.source_registry = SourceRegistry()

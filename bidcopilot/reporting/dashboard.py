@@ -977,6 +977,50 @@ async def admin_scheduler():
     }
 
 
+# ───── Discovery Config API ─────
+
+@app.get("/api/discovery-config")
+async def get_discovery_config():
+    from bidcopilot.discovery.config import DiscoveryConfigManager
+    dcm = DiscoveryConfigManager(_config.discovery_config_path)
+    config = dcm.load()
+    all_adapters = AdapterRegistry.get_all()
+    return {
+        "global_settings": config.global_settings.model_dump(),
+        "adapters": {name: s.model_dump(exclude_none=True) for name, s in config.adapters.items()},
+        "adapter_metadata": {
+            name: {
+                "supported_categories": cls.supported_categories,
+                "default_categories": cls.default_categories,
+                "supports_seniority_filter": cls.supports_seniority_filter,
+                "supports_salary_filter": cls.supports_salary_filter,
+                "requires_auth": cls.requires_auth,
+                "enabled": name in _config.enabled_sites,
+            }
+            for name, cls in sorted(all_adapters.items())
+        },
+    }
+
+
+@app.put("/api/discovery-config")
+async def update_discovery_config(body: dict):
+    from bidcopilot.discovery.config import DiscoveryConfig, DiscoveryConfigManager
+    dcm = DiscoveryConfigManager(_config.discovery_config_path)
+    try:
+        config = DiscoveryConfig(**body)
+        dcm.save(config)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+# ───── Discovery Settings Page ─────
+
+@app.get("/discovery-settings", response_class=HTMLResponse)
+async def discovery_settings_page(request: Request):
+    return templates.TemplateResponse("discovery_settings.html", _template_ctx(request, active_page="discovery"))
+
+
 # ───── Startup ─────
 
 _server_start_time: float = 0

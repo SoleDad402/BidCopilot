@@ -18,24 +18,22 @@ logger = get_logger(__name__)
 
 API_URL = "https://jobicy.com/api/v2/remote-jobs"
 
-# Jobicy industry filter values
-TECH_INDUSTRIES = [
-    "engineering",
-    "data-science",
-    "devops-sysadmin",
-]
-
-
 @AdapterRegistry.register
 class JobicyAdapter(BaseJobSiteAdapter):
     site_name = "jobicy"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=10, delay_between_pages=(2, 5))
+    supported_categories: list[str] = [
+        "engineering", "data-science", "devops-sysadmin", "design", "product",
+        "marketing", "customer-support", "sales", "hr", "copywriting",
+    ]
+    default_categories: list[str] = ["engineering", "data-science", "devops-sysadmin"]
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
+        categories = params.categories or self.default_categories
         seen_ids = set()
         async with httpx.AsyncClient(timeout=30) as client:
-            for tag in TECH_INDUSTRIES:
+            for tag in categories:
                 try:
                     resp = await client.get(
                         API_URL,

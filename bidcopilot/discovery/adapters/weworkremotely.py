@@ -13,23 +13,37 @@ from bidcopilot.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-CATEGORIES = [
-    "remote-jobs/programming",
-    "remote-jobs/devops-sysadmin",
-    "remote-jobs/full-stack-programming",
-    "remote-jobs/back-end-programming",
-    "remote-jobs/front-end-programming",
-]
-
 @AdapterRegistry.register
 class WeWorkRemotelyAdapter(BaseJobSiteAdapter):
     site_name = "weworkremotely"
     requires_auth = False
     rate_limit = RateLimitConfig(requests_per_minute=6, delay_between_pages=(3, 7))
+    supported_categories: list[str] = [
+        "remote-jobs/programming",
+        "remote-jobs/devops-sysadmin",
+        "remote-jobs/full-stack-programming",
+        "remote-jobs/back-end-programming",
+        "remote-jobs/front-end-programming",
+        "remote-jobs/design",
+        "remote-jobs/product",
+        "remote-jobs/customer-support",
+        "remote-jobs/sales-marketing",
+        "remote-jobs/business-exec-management",
+        "remote-jobs/finance-legal",
+        "remote-jobs/copywriting",
+    ]
+    default_categories: list[str] = [
+        "remote-jobs/programming",
+        "remote-jobs/devops-sysadmin",
+        "remote-jobs/full-stack-programming",
+        "remote-jobs/back-end-programming",
+        "remote-jobs/front-end-programming",
+    ]
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
+        categories = params.categories or self.default_categories
         async with httpx.AsyncClient() as client:
-            for category in CATEGORIES:
+            for category in categories:
                 url = f"https://weworkremotely.com/categories/{category}"
                 try:
                     resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})

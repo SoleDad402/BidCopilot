@@ -49,6 +49,60 @@ def init():
         )
         typer.echo("Created default settings at config/settings.yaml")
 
+    # Create default discovery config if missing
+    discovery_path = Path("config/discovery.yaml")
+    if not discovery_path.exists():
+        discovery_path.parent.mkdir(parents=True, exist_ok=True)
+        discovery_path.write_text(
+            "# BidCopilot Discovery Configuration\n"
+            "# Global settings apply to all adapters; per-adapter overrides below.\n"
+            "\n"
+            "global_settings:\n"
+            "  seniority_levels:\n"
+            "    - senior\n"
+            "    - staff\n"
+            "    - lead\n"
+            "    - principal\n"
+            "  job_types:\n"
+            "    - full-time\n"
+            "  remote_preference: remote_only\n"
+            "  posted_within_days: 7\n"
+            "  max_results_per_adapter: 100\n"
+            "  max_pages_default: 5\n"
+            "\n"
+            "adapters:\n"
+            "  remotive:\n"
+            "    categories:\n"
+            "      - software-dev\n"
+            "      - data\n"
+            "      - devops\n"
+            "      - qa\n"
+            "  jobicy:\n"
+            "    categories:\n"
+            "      - engineering\n"
+            "      - data-science\n"
+            "      - devops-sysadmin\n"
+            "  jobright:\n"
+            "    categories:\n"
+            "      - software-engineering\n"
+            "      - data-ai\n"
+            "      - infrastructure-security\n"
+            "  weworkremotely:\n"
+            "    categories:\n"
+            "      - remote-jobs/programming\n"
+            "      - remote-jobs/devops-sysadmin\n"
+            "      - remote-jobs/full-stack-programming\n"
+            "      - remote-jobs/back-end-programming\n"
+            "      - remote-jobs/front-end-programming\n"
+            "  himalayas:\n"
+            "    max_pages: 5\n"
+            "  arbeitnow:\n"
+            "    max_pages: 10\n"
+            "  reed:\n"
+            "    max_pages: 3\n"
+        )
+        typer.echo("Created default discovery config at config/discovery.yaml")
+
     typer.echo("\nBidCopilot initialized! Next steps:")
     typer.echo("  1. Edit your profile: bidcopilot profile edit")
     typer.echo("  2. Set your API key in .env.local: OPENAI_API_KEY=sk-...")
@@ -161,9 +215,9 @@ def discover(
         profile = pm.load()
 
         if site:
-            engine = DiscoveryEngine(enabled_sites=[site])
+            engine = DiscoveryEngine(enabled_sites=[site], discovery_config_path=config.discovery_config_path)
         elif all_sites:
-            engine = DiscoveryEngine(enabled_sites=config.enabled_sites)
+            engine = DiscoveryEngine(enabled_sites=config.enabled_sites, discovery_config_path=config.discovery_config_path)
         else:
             typer.echo("Specify --site or --all")
             return

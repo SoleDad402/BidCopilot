@@ -13,6 +13,8 @@ logger = get_logger(__name__)
 class GenericCareerAdapter(BaseJobSiteAdapter):
     site_name = "generic_career"
     requires_auth = False
+    supported_categories: list[str] = []
+    default_categories: list[str] = []
 
     async def discover_jobs(self, params: SearchParams, ctx=None) -> AsyncIterator[RawJobListing]:
         logger.info("generic_career_discover", note="Requires browser context and LLM — stub for now")
