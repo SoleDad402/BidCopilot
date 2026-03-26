@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e94560"/>
+      <stop offset="100%" stop-color="#ff6b81"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Subtle top shine -->
+  <rect width="64" height="32" rx="14" fill="url(#shine)"/>
+  <!-- B letter -->
+  <path d="M14 14h10c4.5 0 7.5 1.8 7.5 5.5 0 2.8-1.8 4.5-4 5.2 2.8 0.6 5 2.8 5 6 0 4.2-3.2 6.3-8 6.3H14V14z
+           M19.5 23.5h4c2.2 0 3.5-1 3.5-3s-1.3-2.8-3.5-2.8h-4V23.5z
+           M19.5 33.2h4.5c2.5 0 4-1.2 4-3.3 0-2-1.5-3.2-4-3.2h-4.5V33.2z"
+        fill="white" opacity="0.95"/>
+  <!-- C letter -->
+  <path d="M52 25.5c-1.2-2.5-3.8-4-7-4-5 0-8.2 3.5-8.2 9s3.2 9 8.2 9c3.2 0 5.8-1.5 7-4l-3.5-1.8c-0.8 1.5-2 2.3-3.5 2.3-3 0-4.7-2.2-4.7-5.5s1.7-5.5 4.7-5.5c1.5 0 2.7 0.8 3.5 2.3L52 25.5z"
+        fill="white" opacity="0.95"/>
+  <!-- Small crosshair/target accent (represents "bidding/targeting") -->
+  <circle cx="50" cy="14" r="6" fill="none" stroke="white" stroke-width="1.5" opacity="0.5"/>
+  <circle cx="50" cy="14" r="2" fill="white" opacity="0.5"/>
+  <line x1="50" y1="7" x2="50" y2="9" stroke="white" stroke-width="1.2" opacity="0.4"/>
+  <line x1="50" y1="19" x2="50" y2="21" stroke="white" stroke-width="1.2" opacity="0.4"/>
+  <line x1="43" y1="14" x2="45" y2="14" stroke="white" stroke-width="1.2" opacity="0.4"/>
+  <line x1="55" y1="14" x2="57" y2="14" stroke="white" stroke-width="1.2" opacity="0.4"/>
+</svg>
