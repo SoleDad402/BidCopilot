@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - BidCopilot Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: var(--bg-root);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 40px 32px;
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius);
+            background: linear-gradient(135deg, var(--accent), #ff6b81);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 18px;
+            color: #fff;
+            margin-bottom: 16px;
+        }
+        .login-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+        .login-subtitle {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, background 0.2s;
+            box-sizing: border-box;
+        }
+        .form-input:focus {
+            border-color: var(--border-focus);
+            background: var(--bg-input-focus);
+        }
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+        .remember-row input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+        .btn-login {
+            width: 100%;
+            padding: 11px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-login:hover {
+            background: var(--accent-hover);
+        }
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .login-error {
+            display: none;
+            padding: 10px 14px;
+            background: var(--error-subtle);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+            border-radius: var(--radius);
+            color: var(--error);
+            font-size: 0.8125rem;
+            margin-bottom: 16px;
+        }
+        .login-error.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-logo">BC</div>
+            <div class="login-title">BidCopilot Command Center</div>
+            <div class="login-subtitle">Sign in with your CVCopilot account</div>
+        </div>
+
+        <div class="login-error" id="loginError"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label" for="email">Email</label>
+                <input type="email" class="form-input" id="email" placeholder="you@example.com" required autofocus>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" class="form-input" id="password" placeholder="Enter your password" required>
+            </div>
+            <div class="remember-row">
+                <input type="checkbox" id="rememberMe">
+                <label for="rememberMe">Remember me for 30 days</label>
+            </div>
+            <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
+        </form>
+    </div>
+
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            var btn = document.getElementById('loginBtn');
+            var errorEl = document.getElementById('loginError');
+            errorEl.classList.remove('visible');
+
+            btn.textContent = 'Signing in...';
+            btn.disabled = true;
+
+            try {
+                var res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password').value,
+                        rememberMe: document.getElementById('rememberMe').checked
+                    })
+                });
+
+                if (res.ok) {
+                    window.location.href = '/';
+                } else {
+                    var data = await res.json().catch(function() { return {}; });
+                    errorEl.textContent = data.detail || data.error || 'Invalid email or password';
+                    errorEl.classList.add('visible');
+                }
+            } catch (err) {
+                errorEl.textContent = 'Authentication service unavailable. Is CVCopilot running?';
+                errorEl.classList.add('visible');
+            } finally {
+                btn.textContent = 'Sign In';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

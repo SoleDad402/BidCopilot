@@ -100,6 +100,46 @@ def profile_edit():
     os.system(f'{editor} "{pm.path}"')
 
 
+@profile_app.command("sync")
+def profile_sync(
+    token: str = typer.Option(..., help="JWT token from CVCopilot (get it from browser cookies or login)"),
+):
+    """Sync profile from CVCopilot and merge with local BidCopilot extensions."""
+    configure_logging()
+
+    async def _sync():
+        from bidcopilot.auth.client import AuthClient
+        from bidcopilot.config import Config
+        from bidcopilot.profile.manager import ProfileManager
+
+        config = Config()
+        client = AuthClient(config.cvcopilot_url)
+        pm = ProfileManager(config.profile_path)
+
+        # Verify token first
+        user = await client.verify_token(token)
+        if not user:
+            typer.echo("Invalid or expired token.")
+            raise typer.Exit(1)
+
+        # Fetch profile
+        remote = await client.get_profile(token)
+        if not remote:
+            typer.echo("Failed to fetch profile from CVCopilot.")
+            raise typer.Exit(1)
+
+        profile = pm.merge_with_remote(remote)
+        pm.save(profile)
+        typer.echo(f"Profile synced: {profile.full_name} ({profile.email})")
+        typer.echo(f"  Work history: {len(profile.work_history)} entries")
+        typer.echo(f"  Education: {len(profile.education)} entries")
+        typer.echo(f"Saved to {pm.path}")
+
+        await client.close()
+
+    _run(_sync())
+
+
 # --- Discovery commands ---
 @app.command()
 def discover(

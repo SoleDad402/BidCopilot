@@ -34,6 +34,12 @@
             <span class="status-dot"></span>
             <span id="lastUpdate">{% block status_text %}System Online{% endblock %}</span>
         </div>
+        {% if user %}
+        <div class="user-menu" style="display:flex;align-items:center;gap:10px;margin-left:16px;padding-left:16px;border-left:1px solid var(--border-subtle);">
+            <span style="font-size:0.8125rem;color:var(--text-secondary);">{{ user.full_name or user.email }}</span>
+            <button onclick="window.bcLogout()" style="padding:5px 12px;font-size:0.75rem;font-weight:600;background:transparent;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-muted);cursor:pointer;font-family:inherit;transition:color 0.2s,border-color 0.2s;" onmouseover="this.style.color='var(--text-primary)';this.style.borderColor='var(--border)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border-subtle)'">Logout</button>
+        </div>
+        {% endif %}
     </div>
 </header>
 

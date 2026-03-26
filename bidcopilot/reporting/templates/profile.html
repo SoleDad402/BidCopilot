@@ -298,7 +298,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
                 <div>
-                    <div class="section-title">Identity</div>
+                    <div class="section-title">Identity <span id="syncBadge" style="display:none;font-size:0.625rem;font-weight:600;padding:2px 8px;background:var(--blue-subtle);color:var(--blue);border-radius:10px;margin-left:8px;vertical-align:middle;">Synced from CVCopilot</span></div>
                     <div class="section-desc">Personal and contact information</div>
                 </div>
             </div>
@@ -1207,8 +1207,20 @@
     // ============================================================
     // POPULATE FORM FROM PROFILE DATA
     // ============================================================
+    // Remote field names that come from CVCopilot
+    const REMOTE_FIELD_MAP = {
+        'full_name': true, 'email': true, 'phone': true, 'location': true,
+        'linkedin_url': true, 'github_url': true
+    };
+
     function populateForm(data) {
         profileData = data || {};
+        const remoteFields = profileData._remote_fields || [];
+        const hasRemote = remoteFields.length > 0;
+
+        // Show sync badge if profile is synced from CVCopilot
+        const syncBadge = document.getElementById('syncBadge');
+        if (syncBadge) syncBadge.style.display = hasRemote ? 'inline' : 'none';
 
         // Simple inputs and selects via data-field
         document.querySelectorAll('[data-field]').forEach(el => {
@@ -1218,6 +1230,13 @@
                 el.checked = !!val;
             } else {
                 el.value = val;
+            }
+
+            // Disable fields owned by CVCopilot
+            if (hasRemote && REMOTE_FIELD_MAP[el.dataset.field]) {
+                el.disabled = true;
+                el.style.opacity = '0.6';
+                el.title = 'Managed via CVCopilot';
             }
         });
 
@@ -1232,6 +1251,17 @@
         renderSkills();
         renderWorkHistory();
         renderEducation();
+
+        // If synced, mark work history and education as read-only
+        if (hasRemote) {
+            const workToggle = document.getElementById('workAddToggle');
+            if (workToggle) workToggle.style.display = 'none';
+            document.querySelectorAll('#workHistoryList .btn-danger').forEach(b => b.style.display = 'none');
+            // Hide education add/remove buttons
+            const eduAddRow = document.querySelector('[data-section="education"] .inline-add-row');
+            if (eduAddRow) eduAddRow.style.display = 'none';
+            document.querySelectorAll('#educationTableBody .btn-danger').forEach(b => b.style.display = 'none');
+        }
     }
 
     // ============================================================

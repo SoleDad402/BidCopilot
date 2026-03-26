@@ -11,12 +11,14 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, case, text
 from sqlmodel import select
 
+from bidcopilot.auth.client import AuthClient
+from bidcopilot.auth.middleware import AuthMiddleware
 from bidcopilot.config import Config
 from bidcopilot.core.database import get_session, init_db
 from bidcopilot.core.models import (
@@ -32,11 +34,18 @@ from bidcopilot.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+_config = Config()
+_auth_client = AuthClient(_config.cvcopilot_url)
+
 app = FastAPI(title="BidCopilot Command Center")
+
+# Auth middleware — protects all routes except /login and /static
+if _config.auth_enabled:
+    app.add_middleware(AuthMiddleware, auth_client=_auth_client)
+
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-_config = Config()
 _profile_manager = ProfileManager(_config.profile_path)
 
 # --- Stats cache ---
@@ -81,15 +90,76 @@ def _save_pipeline_state(state: dict):
     _pipeline_state_file.write_text(json.dumps(state))
 
 
+# ───── Auth helpers ─────
+
+def _get_user(request: Request) -> dict | None:
+    """Get the authenticated user from request state (set by AuthMiddleware)."""
+    return getattr(request.state, "user", None)
+
+
+def _get_token(request: Request) -> str | None:
+    """Get the JWT token from request state."""
+    return getattr(request.state, "token", None)
+
+
+def _template_ctx(request: Request, **extra) -> dict:
+    """Build template context with user info for header display."""
+    ctx = {"request": request, "user": _get_user(request), "auth_enabled": _config.auth_enabled}
+    ctx.update(extra)
+    return ctx
+
+
+# ───── Auth Endpoints ─────
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.post("/api/auth/login")
+async def api_login(body: dict):
+    email = body.get("email", "")
+    password = body.get("password", "")
+    remember_me = body.get("rememberMe", False)
+
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+
+    result = await _auth_client.login(email, password, remember_me)
+    if not result or "token" not in result:
+        raise HTTPException(401, "Invalid email or password")
+
+    token = result["token"]
+    max_age = 30 * 86400 if remember_me else 7 * 86400
+
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        key="bc_token",
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@app.post("/api/auth/logout")
+async def api_logout():
+    response = JSONResponse({"ok": True})
+    response.delete_cookie("bc_token", path="/")
+    return response
+
+
 # ───── HTML Pages ─────
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request, "active_page": "dashboard"})
+    return templates.TemplateResponse("dashboard.html", _template_ctx(request, active_page="dashboard"))
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
-    return templates.TemplateResponse("profile.html", {"request": request, "active_page": "profile"})
+    return templates.TemplateResponse("profile.html", _template_ctx(request, active_page="profile"))
 
 
 # ───── Stats API ─────
@@ -421,8 +491,18 @@ async def trigger_matching(background_tasks: BackgroundTasks):
 # ───── Profile API ─────
 
 @app.get("/api/profile")
-async def get_profile():
+async def get_profile(request: Request):
     try:
+        token = _get_token(request)
+        if _config.auth_enabled and token:
+            # Fetch core profile from CVCopilot and merge with local extensions
+            remote = await _auth_client.get_profile(token)
+            if remote:
+                profile = _profile_manager.merge_with_remote(remote)
+                data = profile.model_dump()
+                data["_remote_fields"] = list(ProfileManager.REMOTE_FIELDS)
+                return data
+        # Fallback: local-only profile
         profile = _profile_manager.get()
         return profile.model_dump()
     except FileNotFoundError:
@@ -431,6 +511,11 @@ async def get_profile():
 @app.put("/api/profile")
 async def update_profile(body: dict):
     try:
+        if _config.auth_enabled:
+            # Only save BidCopilot-specific fields locally
+            _profile_manager.save_local_extensions(body)
+            return {"ok": True}
+        # Auth disabled: save everything locally
         profile = UserProfile(**body)
         _profile_manager.save(profile)
         return {"ok": True}

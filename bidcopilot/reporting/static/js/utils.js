@@ -51,11 +51,24 @@
     function api(url, opts) {
         opts = opts || {};
         return fetch(url, opts).then(function (res) {
+            if (res.status === 401) {
+                window.location.href = '/login';
+                throw new Error('Session expired');
+            }
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
         }).catch(function (e) {
-            showToast('Request failed: ' + e.message, 'error');
+            if (e.message !== 'Session expired') {
+                showToast('Request failed: ' + e.message, 'error');
+            }
             throw e;
+        });
+    }
+
+    /* ── Logout ── */
+    function bcLogout() {
+        fetch('/api/auth/logout', { method: 'POST' }).finally(function () {
+            window.location.href = '/login';
         });
     }
 
@@ -191,6 +204,7 @@
         setNestedValue: setNestedValue
     };
 
-    // Also expose showToast directly for convenience
+    // Also expose showToast and bcLogout directly for convenience
     window.showToast = showToast;
+    window.bcLogout = bcLogout;
 })();

@@ -76,6 +76,11 @@
                 var titleMatch = html.match(/<title>([^<]*)<\/title>/);
                 if (titleMatch) document.title = titleMatch[1];
             }).catch(function (err) {
+                // On 401, redirect to login instead of hard nav
+                if (err.message && err.message.indexOf('401') !== -1) {
+                    window.location.href = '/login';
+                    return;
+                }
                 // Fallback: hard navigation
                 console.warn('Router fallback:', err);
                 window.location.href = url;

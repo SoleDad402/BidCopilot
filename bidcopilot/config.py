@@ -48,6 +48,8 @@ class Config(BaseSettings):
     db_path: str = "data/bidcopilot.db"
     profile_path: str = "config/profile.yaml"
     settings_path: str = "config/settings.yaml"
+    cvcopilot_url: str = "https://cvcopilot-production.up.railway.app"
+    auth_enabled: bool = True
     enabled_sites: list[str] = Field(
         default_factory=lambda: [
             # Tier 1: Free public API adapters
