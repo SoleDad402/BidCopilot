@@ -17,6 +17,9 @@ env/
 *.swp
 *.swo
 
+# Claude
+.claude/settings.local.json
+
 # Environment & secrets
 .env
 .env.local
