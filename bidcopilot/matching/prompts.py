@@ -72,6 +72,37 @@ Guidelines:
 - Keep it professional but personable
 - Don't be generic — tailor to this specific role and company"""
 
+GREENHOUSE_CUSTOM_QUESTION_PROMPT = """You are filling out a Greenhouse job application.
+Answer the following custom question from the application form.
+
+## Question
+{question}
+
+## Job Details
+Title: {job_title} at {company}
+Department: {department}
+Location: {location}
+Description (excerpt): {job_description}
+
+## Candidate Profile
+Name: {candidate_name}
+Current Title: {current_title}
+Years of Experience: {years_experience}
+Skills: {skills}
+Specializations: {specializations}
+
+## Available Options (if dropdown/select)
+{options}
+
+## Rules:
+- If this is a text/textarea field: write a thoughtful, specific 2-4 sentence answer
+- Reference relevant skills and experience from the candidate profile
+- Mention the specific company and role by name to show genuine interest
+- Be professional but personable — avoid generic boilerplate
+- If this is asking for a number (salary, years), return just the number
+- If you truly cannot determine an answer, return exactly: NEEDS_HUMAN_INPUT
+- If options are provided: return the exact option text that best fits"""
+
 SKILL_EXTRACT_PROMPT = """Extract technical skills and requirements from this job description.
 
 Job Description:
