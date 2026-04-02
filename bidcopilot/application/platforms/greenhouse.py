@@ -461,7 +461,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
                 if ftype == "multi_value_single_select" and len(values) == 2:
                     labels_lower = {v.get("label", "").lower() for v in values}
                     if labels_lower == {"yes", "no"}:
-                        answer = self._answer_yes_no(label, profile)
+                        answer = await self._answer_yes_no(label, profile)
                         for v in values:
                             if v.get("label", "").lower() == answer:
                                 field_map[fname] = str(v.get("label", v.get("value", "")))
@@ -552,27 +552,45 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
         return None
 
-    def _answer_yes_no(self, label: str, profile: UserProfile) -> str:
-        """Deterministic yes/no for common boolean questions."""
-        label_lower = label.lower()
+    async def _answer_yes_no(self, label: str, profile: UserProfile) -> str:
+        """Use LLM to judge yes/no based on question + user profile."""
+        import httpx
+        import os
 
-        if any(kw in label_lower for kw in ("sponsor", "visa", "immigration")):
-            return "yes" if profile.visa_sponsorship_needed else "no"
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if not api_key:
+            try:
+                from pathlib import Path
+                for line in Path(".env.local").read_text().splitlines():
+                    if line.startswith("OPENAI_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+            except Exception:
+                pass
 
-        if any(kw in label_lower for kw in ("authorized", "eligible", "legally")):
-            return "no" if profile.visa_sponsorship_needed else "yes"
+        if not api_key:
+            # Fallback to safe default
+            return "no"
 
-        if any(kw in label_lower for kw in ("relocat",)):
-            return "yes" if profile.willing_to_relocate else "no"
-
-        if any(kw in label_lower for kw in ("remote", "work from home")):
-            return "yes" if profile.remote_preference in ("remote_only", "hybrid") else "no"
-
-        if any(kw in label_lower for kw in ("18", "legal age")):
-            return "yes"
-
-        # Default: yes for most "are you willing to…" questions
-        return "yes"
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={
+                        "model": "gpt-4o-mini",
+                        "temperature": 0,
+                        "max_tokens": 5,
+                        "messages": [
+                            {"role": "system", "content": "Answer ONLY 'yes' or 'no'. Nothing else."},
+                            {"role": "user", "content": f"Question: {label}\n\nCandidate profile:\n{profile.serialize_for_llm()}\n\nAnswer yes or no:"},
+                        ],
+                    },
+                )
+                answer = resp.json()["choices"][0]["message"]["content"].strip().lower()
+                return "yes" if "yes" in answer else "no"
+        except Exception:
+            return "no"
 
     # ── Browser form filling ────────────────────────────────────────────
 
