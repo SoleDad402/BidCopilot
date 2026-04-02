@@ -1,48 +1,98 @@
 {% extends "base.html" %}
 {% block title %}Auto-Bid Test — BidCopilot{% endblock %}
 
+{% block head_extra_inner %}
+.ab-header { background:linear-gradient(145deg,#0f172a,#1e1b4b 50%,#4338ca); border-radius:16px; padding:32px; margin-bottom:24px; color:#fff; }
+.ab-input-row { display:flex; gap:12px; align-items:stretch; }
+.ab-input { flex:1; padding:10px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:0.875rem; font-family:inherit; outline:none; transition:border-color 0.2s; }
+.ab-input:focus { border-color:#6366f1; }
+.ab-btn { padding:10px 24px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; border:none; border-radius:8px; font-weight:600; font-size:0.875rem; cursor:pointer; white-space:nowrap; font-family:inherit; transition:opacity 0.2s; }
+.ab-btn:hover { opacity:0.9; }
+.ab-btn:disabled { opacity:0.5; cursor:not-allowed; }
+.ab-btn-outline { background:none; border:1.5px solid #6366f1; color:#6366f1; }
+.ab-btn-outline:hover { background:rgba(99,102,241,0.05); }
+.ab-btn-sm { padding:5px 12px; font-size:0.75rem; border-radius:6px; }
+.ab-btn-green { background:linear-gradient(135deg,#10b981,#059669); }
+.ab-btn-amber { background:#f59e0b; color:#000; }
+.ab-progress { height:4px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin-top:12px; }
+.ab-progress-bar { height:100%; width:0%; background:linear-gradient(90deg,#6366f1,#818cf8); transition:width 0.5s; border-radius:4px; }
+.ab-job-card { padding:20px; margin-bottom:20px; }
+.ab-job-title { font-size:1.25rem; font-weight:700; margin:0 0 4px; }
+.ab-job-meta { display:flex; gap:16px; font-size:0.8125rem; color:var(--text-secondary); flex-wrap:wrap; }
+.ab-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:600; }
+.ab-badge-green { background:#dcfce7; color:#166534; }
+.ab-badge-blue { background:#dbeafe; color:#1e40af; }
+.ab-badge-amber { background:#fef3c7; color:#92400e; }
+.ab-badge-purple { background:#ede9fe; color:#5b21b6; }
+.ab-badge-gray { background:#f1f5f9; color:#475569; }
+.ab-field-row { display:flex; align-items:flex-start; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border-subtle); transition:background 0.15s; }
+.ab-field-row:hover { background:var(--bg-alt); }
+.ab-field-label { width:220px; flex-shrink:0; font-weight:500; font-size:0.875rem; }
+.ab-field-label .required { color:#ef4444; margin-left:2px; }
+.ab-field-value { flex:1; font-size:0.875rem; min-width:0; }
+.ab-field-actions { width:140px; flex-shrink:0; display:flex; gap:6px; align-items:flex-start; }
+.ab-textarea { width:100%; padding:8px 10px; border:1.5px solid var(--border); border-radius:6px; font-size:0.8125rem; font-family:inherit; resize:vertical; min-height:60px; outline:none; }
+.ab-textarea:focus { border-color:#6366f1; }
+.ab-stats { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.ab-stat { display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:0.8125rem; }
+.ab-generating { display:inline-flex; align-items:center; gap:6px; color:#6366f1; font-size:0.8rem; }
+.ab-spinner { width:14px; height:14px; border:2px solid #e2e8f0; border-top-color:#6366f1; border-radius:50%; animation:spin 0.6s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+{% endblock %}
+
 {% block body %}
-<div style="max-width:800px;margin:0 auto;padding:24px;">
+<div style="max-width:900px;margin:0 auto;padding:24px;">
 
   <!-- Header -->
-  <div style="background:linear-gradient(145deg,#0f172a,#1e1b4b 50%,#4338ca);border-radius:16px;padding:32px;margin-bottom:24px;color:#fff;">
+  <div class="ab-header">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
       <span style="font-size:24px;">&#128640;</span>
       <h2 style="margin:0;font-size:1.5rem;font-weight:700;">Auto-Bid Test</h2>
-      <span style="background:rgba(255,255,255,0.15);padding:2px 10px;border-radius:4px;font-size:0.75rem;font-weight:600;">Greenhouse</span>
+      <span class="ab-badge" style="background:rgba(255,255,255,0.15);color:#fff;">Greenhouse</span>
     </div>
     <p style="opacity:0.7;font-size:0.875rem;margin:0;">
-      Paste a Greenhouse job URL. The engine will extract the job, generate a tailored resume, open a browser,
-      fill the form, and <strong>pause</strong> so you can review before submitting.
+      Step 1: Extract &amp; preview. Step 2: Review and fill custom questions. Step 3: Launch browser.
     </p>
   </div>
 
   <!-- URL Input -->
   <div class="card" style="padding:20px;margin-bottom:20px;">
-    <div style="display:flex;gap:12px;align-items:stretch;">
-      <input type="text" id="jobUrl" placeholder="https://boards.greenhouse.io/company/jobs/123456"
-        style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:0.875rem;font-family:inherit;outline:none;transition:border-color 0.2s;"
-        onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='var(--border)'"
-      >
-      <select id="modeSelect" style="padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:0.875rem;font-family:inherit;background:#fff;cursor:pointer;">
-        <option value="pause">Fill & Pause (review before submit)</option>
-        <option value="dry_run">Dry Run (no browser)</option>
-        <option value="submit">Fill & Submit (no pause)</option>
-      </select>
-      <button id="runBtn" onclick="runAutoBid()"
-        style="padding:10px 24px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:0.875rem;cursor:pointer;white-space:nowrap;font-family:inherit;">
-        Run
-      </button>
+    <div class="ab-input-row">
+      <input type="text" id="jobUrl" class="ab-input" placeholder="https://boards.greenhouse.io/company/jobs/123456">
+      <button id="previewBtn" class="ab-btn ab-btn-outline" onclick="doPreview()">Extract &amp; Preview</button>
     </div>
-    <div id="progress" style="display:none;margin-top:12px;">
-      <div style="height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
-        <div id="progressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);transition:width 0.5s;border-radius:4px;"></div>
-      </div>
+    <div id="progress" style="display:none;">
+      <div class="ab-progress"><div id="progressBar" class="ab-progress-bar"></div></div>
       <p id="progressText" style="font-size:0.8rem;color:var(--text-secondary);margin-top:6px;"></p>
     </div>
   </div>
 
-  <!-- Result -->
+  <!-- Job Info (shown after extract) -->
+  <div id="jobCard" class="card ab-job-card" style="display:none;"></div>
+
+  <!-- Stats -->
+  <div id="stats" class="ab-stats" style="display:none;"></div>
+
+  <!-- Field Review Panel -->
+  <div id="fieldPanel" class="card" style="display:none;margin-bottom:20px;">
+    <div style="padding:16px 16px 8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="margin:0;font-size:1rem;font-weight:700;">Form Field Review</h3>
+        <p style="margin:4px 0 0;font-size:0.8rem;color:var(--text-secondary);">Review pre-filled fields. For custom questions, click Auto-gen or type manually.</p>
+      </div>
+    </div>
+    <div id="fieldList"></div>
+    <div style="padding:16px;border-top:1px solid var(--border-subtle);display:flex;gap:12px;">
+      <button id="launchBtn" class="ab-btn ab-btn-green" onclick="launchBrowser()" disabled>
+        Launch Browser (Fill &amp; Pause)
+      </button>
+      <button class="ab-btn ab-btn-outline ab-btn-sm" onclick="launchBrowser('submit')">
+        Launch &amp; Auto-Submit
+      </button>
+    </div>
+  </div>
+
+  <!-- Browser Result -->
   <div id="result" style="display:none;"></div>
 
 </div>
@@ -50,52 +100,274 @@
 
 {% block scripts %}
 <script>
-async function runAutoBid() {
+let _job = null;
+let _fields = [];
+let _customAnswers = {}; // fname -> user-edited answer
+
+async function doPreview() {
   const url = document.getElementById('jobUrl').value.trim();
   if (!url) return;
 
-  const mode = document.getElementById('modeSelect').value;
-  const btn = document.getElementById('runBtn');
+  const btn = document.getElementById('previewBtn');
   const progress = document.getElementById('progress');
-  const progressBar = document.getElementById('progressBar');
-  const progressText = document.getElementById('progressText');
-  const result = document.getElementById('result');
+  const bar = document.getElementById('progressBar');
+  const text = document.getElementById('progressText');
 
   btn.disabled = true;
-  btn.textContent = 'Running...';
+  btn.textContent = 'Extracting...';
   progress.style.display = 'block';
-  result.style.display = 'none';
-  progressBar.style.width = '10%';
+  bar.style.width = '30%';
+  text.textContent = 'Fetching job metadata and mapping fields...';
+
+  try {
+    const resp = await fetch('/api/autobid/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_url: url }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const data = await resp.json();
+    bar.style.width = '100%';
+    text.textContent = 'Done!';
+
+    _job = data.job;
+    _fields = data.fields;
+    _customAnswers = {};
+
+    renderJobCard();
+    renderStats();
+    renderFields();
+
+    document.getElementById('launchBtn').disabled = false;
+  } catch (err) {
+    bar.style.width = '100%';
+    bar.style.background = '#ef4444';
+    text.textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Extract & Preview';
+  }
+}
+
+function renderJobCard() {
+  const el = document.getElementById('jobCard');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <h3 class="ab-job-title">${_job.title}</h3>
+    <div class="ab-job-meta">
+      <span>${_job.company}</span>
+      ${_job.location ? `<span>${_job.location}</span>` : ''}
+      ${_job.department ? `<span>${_job.department}</span>` : ''}
+    </div>
+  `;
+}
+
+function renderStats() {
+  const filled = _fields.filter(f => f.source === 'profile').length;
+  const needsInput = _fields.filter(f => f.source === 'needs_input').length;
+  const files = _fields.filter(f => f.source === 'file').length;
+  const el = document.getElementById('stats');
+  el.style.display = 'flex';
+  el.innerHTML = `
+    <div class="ab-stat" style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);">
+      <strong style="color:#10b981;">${filled}</strong> <span>Pre-filled</span>
+    </div>
+    <div class="ab-stat" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);">
+      <strong style="color:#f59e0b;">${needsInput}</strong> <span>Need Input</span>
+    </div>
+    <div class="ab-stat" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">
+      <strong style="color:#6366f1;">${files}</strong> <span>File Uploads</span>
+    </div>
+    <div class="ab-stat" style="background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.15);">
+      <strong>${_fields.length}</strong> <span>Total</span>
+    </div>
+  `;
+}
+
+function renderFields() {
+  const el = document.getElementById('fieldList');
+  const panel = document.getElementById('fieldPanel');
+  panel.style.display = 'block';
+
+  let html = '';
+  for (const f of _fields) {
+    const badgeClass = f.source === 'profile' ? 'ab-badge-green'
+      : f.source === 'file' ? 'ab-badge-blue'
+      : 'ab-badge-amber';
+    const badgeLabel = f.source === 'profile' ? 'Profile'
+      : f.source === 'file' ? 'File Upload'
+      : 'Needs Input';
+
+    const req = f.required ? '<span class="required">*</span>' : '';
+
+    let valueHtml = '';
+    if (f.source === 'file') {
+      valueHtml = '<span style="color:var(--text-secondary);font-style:italic;">Auto-uploaded by browser</span>';
+    } else if (f.source === 'profile' && f.value) {
+      const display = f.value.length > 80 ? f.value.slice(0, 80) + '...' : f.value;
+      valueHtml = `<span style="color:#166534;">${escHtml(display)}</span>`;
+    } else if (f.options && f.options.length > 0 && f.source !== 'profile') {
+      valueHtml = `<span style="color:var(--text-secondary);">${f.options.slice(0, 4).join(', ')}${f.options.length > 4 ? '...' : ''}</span>`;
+    } else {
+      valueHtml = `<div id="val_${f.name}"><span style="color:#92400e;font-style:italic;">Requires answer</span></div>`;
+    }
+
+    let actionsHtml = '';
+    if (f.source === 'needs_input') {
+      actionsHtml = `
+        <button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${f.name}', '${escAttr(f.label)}')">Auto-gen</button>
+        <button class="ab-btn ab-btn-sm ab-btn-outline" onclick="manualEdit('${f.name}', '${escAttr(f.label)}')">Edit</button>
+      `;
+    }
+
+    html += `
+      <div class="ab-field-row" id="row_${f.name}">
+        <div class="ab-field-label">${escHtml(f.label)}${req}</div>
+        <div class="ab-field-value">${valueHtml}</div>
+        <div class="ab-field-actions">${actionsHtml}</div>
+      </div>
+    `;
+  }
+  el.innerHTML = html;
+}
+
+async function autoGen(fname, label) {
+  const valEl = document.getElementById('val_' + fname);
+  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  if (!valEl) return;
+
+  valEl.innerHTML = '<span class="ab-generating"><span class="ab-spinner"></span> Generating...</span>';
+  actEl.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/autobid/generate-answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: label,
+        job_title: _job.title,
+        company: _job.company,
+        job_description: _job.description || '',
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'Failed');
+
+    showEditableAnswer(fname, label, data.answer);
+  } catch (err) {
+    valEl.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+    actEl.innerHTML = `<button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${fname}', '${escAttr(label)}')">Retry</button>`;
+  }
+}
+
+function manualEdit(fname, label) {
+  const current = _customAnswers[fname] || '';
+  showEditableAnswer(fname, label, current);
+}
+
+function showEditableAnswer(fname, label, answer) {
+  const valEl = document.getElementById('val_' + fname);
+  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  if (!valEl) return;
+
+  valEl.innerHTML = `<textarea class="ab-textarea" id="edit_${fname}" rows="3">${escHtml(answer)}</textarea>`;
+  actEl.innerHTML = `
+    <button class="ab-btn ab-btn-sm ab-btn-green" onclick="acceptAnswer('${fname}', '${escAttr(label)}')">Accept</button>
+    <button class="ab-btn ab-btn-sm" style="background:#ef4444;" onclick="rejectAnswer('${fname}', '${escAttr(label)}')">Reject</button>
+  `;
+
+  // Focus the textarea
+  const ta = document.getElementById('edit_' + fname);
+  if (ta) ta.focus();
+}
+
+function acceptAnswer(fname, label) {
+  const ta = document.getElementById('edit_' + fname);
+  const answer = ta ? ta.value.trim() : '';
+  if (!answer) return;
+
+  _customAnswers[fname] = answer;
+
+  const valEl = document.getElementById('val_' + fname);
+  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  const display = answer.length > 100 ? answer.slice(0, 100) + '...' : answer;
+  valEl.innerHTML = `<span style="color:#5b21b6;" title="${escAttr(answer)}">${escHtml(display)}</span>`;
+  actEl.innerHTML = `
+    <span class="ab-badge ab-badge-purple">Accepted</span>
+    <button class="ab-btn ab-btn-sm ab-btn-outline" onclick="manualEdit('${fname}', '${escAttr(label)}')">Re-edit</button>
+  `;
+
+  updateStats();
+}
+
+function rejectAnswer(fname, label) {
+  delete _customAnswers[fname];
+  const valEl = document.getElementById('val_' + fname);
+  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  valEl.innerHTML = '<span style="color:#92400e;font-style:italic;">Requires answer</span>';
+  actEl.innerHTML = `
+    <button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${fname}', '${escAttr(label)}')">Auto-gen</button>
+    <button class="ab-btn ab-btn-sm ab-btn-outline" onclick="manualEdit('${fname}', '${escAttr(label)}')">Edit</button>
+  `;
+  updateStats();
+}
+
+function updateStats() {
+  const answered = Object.keys(_customAnswers).length;
+  const needsInput = _fields.filter(f => f.source === 'needs_input').length;
+  const remaining = needsInput - answered;
+  // Update the needs input stat
+  const statEls = document.querySelectorAll('.ab-stat');
+  if (statEls[1]) {
+    statEls[1].innerHTML = `<strong style="color:#f59e0b;">${remaining}</strong> <span>Need Input</span>`;
+  }
+}
+
+async function launchBrowser(mode) {
+  mode = mode || 'pause';
+  const url = document.getElementById('jobUrl').value.trim();
+  if (!url) return;
+
+  const launchBtn = document.getElementById('launchBtn');
+  launchBtn.disabled = true;
+  launchBtn.textContent = 'Launching browser...';
+
+  const progress = document.getElementById('progress');
+  const bar = document.getElementById('progressBar');
+  const text = document.getElementById('progressText');
+  progress.style.display = 'block';
+  bar.style.width = '20%';
+  bar.style.background = 'linear-gradient(90deg,#10b981,#34d399)';
+  text.textContent = 'Generating resume and opening browser...';
 
   const steps = [
-    { pct: 10, text: 'Extracting job metadata...' },
     { pct: 30, text: 'Generating tailored resume via CVCopilot...' },
     { pct: 60, text: 'Opening browser and filling form...' },
-    { pct: 80, text: mode === 'pause' ? 'Form filled — paused for your review. Check the browser window.' : 'Submitting...' },
+    { pct: 80, text: mode === 'pause' ? 'Form filled! Review in the browser window, then close Playwright Inspector to continue.' : 'Submitting...' },
   ];
-
   let step = 0;
   const interval = setInterval(() => {
     if (step < steps.length) {
-      progressBar.style.width = steps[step].pct + '%';
-      progressText.textContent = steps[step].text;
+      bar.style.width = steps[step].pct + '%';
+      text.textContent = steps[step].text;
       step++;
     }
-  }, 2000);
+  }, 3000);
 
   try {
     const resp = await fetch('/api/autobid/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_url: url, mode }),
+      body: JSON.stringify({ job_url: url, mode, custom_answers: _customAnswers }),
     });
     const data = await resp.json();
     clearInterval(interval);
-    progressBar.style.width = '100%';
-    progressText.textContent = 'Done!';
+    bar.style.width = '100%';
+    text.textContent = 'Done!';
 
-    const ok = data.success;
+    const result = document.getElementById('result');
     result.style.display = 'block';
+    const ok = data.success;
     result.innerHTML = `
       <div class="card" style="padding:24px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
@@ -107,7 +379,6 @@ async function runAutoBid() {
           <div><strong>Fields filled:</strong> ${data.fields_filled || 0}</div>
           <div><strong>Questions answered:</strong> ${data.questions_answered || 0}</div>
           ${data.resume_path ? `<div><strong>Resume:</strong> ${data.resume_path}</div>` : ''}
-          ${data.cover_letter_path ? `<div><strong>Cover letter:</strong> ${data.cover_letter_path}</div>` : ''}
           ${data.screenshot_path ? `<div><strong>Screenshot:</strong> ${data.screenshot_path}</div>` : ''}
           ${data.confirmation ? `<div style="grid-column:span 2"><strong>Confirmation:</strong> ${data.confirmation}</div>` : ''}
           ${data.error ? `<div style="grid-column:span 2;color:#ef4444"><strong>Error:</strong> ${data.error}</div>` : ''}
@@ -116,20 +387,17 @@ async function runAutoBid() {
     `;
   } catch (err) {
     clearInterval(interval);
-    progressBar.style.width = '100%';
-    progressBar.style.background = '#ef4444';
-    progressText.textContent = 'Failed: ' + err.message;
-    result.style.display = 'block';
-    result.innerHTML = `<div class="card" style="padding:20px;color:#ef4444;">Error: ${err.message}</div>`;
+    bar.style.background = '#ef4444';
+    text.textContent = 'Error: ' + err.message;
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Run';
+    launchBtn.disabled = false;
+    launchBtn.textContent = 'Launch Browser (Fill & Pause)';
   }
 }
 
-// Enter key triggers run
-document.getElementById('jobUrl').addEventListener('keydown', e => {
-  if (e.key === 'Enter') runAutoBid();
-});
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+document.getElementById('jobUrl').addEventListener('keydown', e => { if (e.key === 'Enter') doPreview(); });
 </script>
 {% endblock %}

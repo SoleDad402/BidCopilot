@@ -1045,41 +1045,134 @@ async def autobid_page(request: Request):
     return templates.TemplateResponse(request, "autobid.html", _template_ctx(request, active_page="autobid"))
 
 
-@app.post("/api/autobid/test")
-async def api_autobid_test(body: dict, request: Request):
-    """Run a Greenhouse auto-bid in pause mode. Opens a visible browser,
-    fills the form, and pauses so the user can review."""
-    job_url = body.get("job_url", "")
-    if not job_url:
-        raise HTTPException(400, "job_url is required")
-
-    from bidcopilot.application.platforms.greenhouse import GreenhouseBidEngine
+async def _load_autobid_profile(request: Request):
+    """Load user profile: prefer CVCopilot remote, fallback to local YAML."""
     from bidcopilot.profile.manager import ProfileManager
-    from bidcopilot.profile.schemas import UserProfile
-
-    # Try to load profile from logged-in user's CVCopilot account first
-    profile = None
-    user = _get_user(request)
     token = getattr(request.state, "token", None)
     if token:
         try:
             remote = await _auth_client.get_profile(token)
             if remote:
                 pm = ProfileManager(_config.profile_path)
-                profile = pm.merge_with_remote(remote)
-                logger.info("autobid_using_remote_profile", name=profile.full_name)
-        except Exception as e:
-            logger.warning("autobid_remote_profile_failed", error=str(e))
+                return pm.merge_with_remote(remote)
+        except Exception:
+            pass
+    pm = ProfileManager(_config.profile_path)
+    return pm.load()
 
-    # Fallback to local YAML profile
-    if not profile:
-        pm = ProfileManager(_config.profile_path)
-        profile = pm.load()
-        logger.info("autobid_using_local_profile", name=profile.full_name)
 
+@app.post("/api/autobid/preview")
+async def api_autobid_preview(body: dict, request: Request):
+    """Extract job and build field map — no browser, just data."""
+    job_url = body.get("job_url", "")
+    if not job_url:
+        raise HTTPException(400, "job_url is required")
+
+    from bidcopilot.application.platforms.greenhouse import GreenhouseBidEngine
+    profile = await _load_autobid_profile(request)
+    engine = GreenhouseBidEngine()
+
+    job = await engine.extract_job(job_url)
+    field_map, custom_count = await engine._build_field_map(job, profile)
+
+    # Categorize fields for the UI
+    fields = []
+    for q in job.questions:
+        label = q.get("label", "").strip()
+        required = q.get("required", False)
+        for f in q.get("fields", []):
+            fname = f.get("name", "")
+            ftype = f.get("type", "")
+            values = [v.get("label", "") for v in f.get("values", [])]
+            value = field_map.get(fname, "")
+            is_file = ftype == "input_file"
+            source = "file" if is_file else "profile" if value and value != "NEEDS_HUMAN_INPUT" else "needs_input"
+            fields.append({
+                "name": fname, "label": label, "type": ftype,
+                "value": value if value != "NEEDS_HUMAN_INPUT" else "",
+                "source": source, "required": required, "options": values,
+            })
+
+    return {
+        "job": {
+            "job_id": job.job_id, "title": job.title, "company": job.company,
+            "location": job.location, "department": job.department,
+            "description": job.description_text[:2000], "url": job.url,
+        },
+        "fields": fields,
+        "profile_name": profile.full_name,
+    }
+
+
+@app.post("/api/autobid/generate-answer")
+async def api_autobid_generate(body: dict, request: Request):
+    """Generate an LLM answer for a custom question."""
+    question = body.get("question", "")
+    job_title = body.get("job_title", "")
+    company = body.get("company", "")
+    job_description = body.get("job_description", "")
+    if not question:
+        raise HTTPException(400, "question is required")
+
+    profile = await _load_autobid_profile(request)
+
+    import httpx
+    prompt = f"""Answer this job application question in 2-4 sentences. Be specific and genuine.
+
+Question: {question}
+Role: {job_title} at {company}
+Job description excerpt: {job_description[:1500]}
+
+Candidate: {profile.full_name}, {profile.current_title}
+Experience: {profile.years_of_experience} years
+Skills: {', '.join(s.name for s in profile.skills[:10])}
+
+Write the answer:"""
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {__import__('os').environ.get('OPENAI_API_KEY', '')}"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "temperature": 0.7,
+                    "max_tokens": 400,
+                    "messages": [
+                        {"role": "system", "content": "You are filling out a job application. Write concise, genuine answers. Never use clichés."},
+                        {"role": "user", "content": prompt},
+                    ],
+                },
+            )
+            data = resp.json()
+            answer = data["choices"][0]["message"]["content"].strip()
+            return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(500, f"LLM generation failed: {e}")
+
+
+@app.post("/api/autobid/test")
+async def api_autobid_test(body: dict, request: Request):
+    """Run Greenhouse auto-bid with browser. Accepts pre-filled custom answers."""
+    job_url = body.get("job_url", "")
+    custom_answers = body.get("custom_answers", {})  # fname -> answer
+    if not job_url:
+        raise HTTPException(400, "job_url is required")
+
+    from bidcopilot.application.platforms.greenhouse import GreenhouseBidEngine
+    profile = await _load_autobid_profile(request)
     engine = GreenhouseBidEngine(headless=False)
 
-    mode = body.get("mode", "pause")  # pause | dry_run | submit
+    # Extract and build field map, then inject custom answers
+    job = await engine.extract_job(job_url)
+    field_map, _ = await engine._build_field_map(job, profile)
+
+    # Override with user-provided custom answers
+    for fname, answer in custom_answers.items():
+        if answer and answer.strip():
+            field_map[fname] = answer
+
+    mode = body.get("mode", "pause")
     result = await engine.apply(
         job_url=job_url,
         profile=profile,
