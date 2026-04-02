@@ -821,11 +821,11 @@ class GreenhouseBidEngine(BasePlatformEngine):
         return False
 
     async def _fill_select_by_index(self, page, elem, index: int, label: str, fname: str) -> bool:
-        """Select an option by its exact index. Click → ArrowDown × (index+1) → Enter."""
+        """Select an option by its exact index. Click → ArrowDown × index → Enter."""
         try:
             await elem.click()
             await asyncio.sleep(0.4)
-            for _ in range(index + 1):
+            for _ in range(index):
                 await page.keyboard.press("ArrowDown")
                 await asyncio.sleep(0.1)
             await page.keyboard.press("Enter")
