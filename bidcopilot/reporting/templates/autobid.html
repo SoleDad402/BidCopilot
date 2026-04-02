@@ -304,6 +304,18 @@ function acceptAnswer(fname, label) {
     <button class="ab-btn ab-btn-sm ab-btn-outline" onclick="manualEdit('${fname}', '${escAttr(label)}')">Re-edit</button>
   `;
 
+  // Track pattern for reinforcement learning (fire and forget)
+  fetch('/api/autobid/track-pattern', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question: label,
+      company: _job?.company || '',
+      choice: 'auto',
+      answer: answer,
+    }),
+  }).catch(() => {}); // non-blocking
+
   updateStats();
 }
 

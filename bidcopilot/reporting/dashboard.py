@@ -1175,6 +1175,26 @@ async def api_autobid_generate(body: dict, request: Request):
         raise HTTPException(504, "CVCopilot generation timed out")
 
 
+@app.post("/api/autobid/track-pattern")
+async def api_autobid_track_pattern(body: dict, request: Request):
+    """Track a question pattern choice — proxies to CVCopilot."""
+    token = getattr(request.state, "token", None)
+    if not token:
+        raise HTTPException(401, "Authentication required")
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{_config.cvcopilot_url}/api/v1/autobid/patterns/track",
+                headers={"Authorization": f"Bearer {token}"},
+                json=body,
+            )
+            return resp.json()
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/api/autobid/test")
 async def api_autobid_test(body: dict, request: Request):
     """Run Greenhouse auto-bid with browser. Accepts pre-filled custom answers."""

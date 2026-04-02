@@ -688,54 +688,43 @@ class GreenhouseBidEngine(BasePlatformEngine):
         """
         filled = 0
 
-        # --- Country phone code dropdown ---
-        # Greenhouse renders a <select> for country code next to the phone input.
-        # It uses various selectors and option formats across board themes.
+        # --- Country phone code selector ---
+        # Greenhouse uses a React Select component (not native <select>).
+        # We find the input by id="country", click it, type to search, then
+        # press ArrowDown + Enter to select the first match (United States).
         try:
-            # Find ALL select elements on page — the country one is usually small
-            all_selects = await page.query_selector_all("select")
-            for elem in all_selects:
-                elem_name = await elem.get_attribute("name") or ""
-                elem_id = await elem.get_attribute("id") or ""
-                elem_class = await elem.get_attribute("class") or ""
-                # Check if this looks like a country selector
-                if any(kw in (elem_name + elem_id + elem_class).lower() for kw in ("country", "phone_country", "dialcode")):
-                    # Try multiple value/label formats for US
-                    for attempt in [
-                        {"label": "United States +1"},
-                        {"label": "United States"},
-                        {"label": "United States (+1)"},
-                        {"label": "US"},
-                        {"value": "US"},
-                        {"value": "us"},
-                        {"value": "United States"},
-                        {"value": "1"},
-                    ]:
-                        try:
-                            await elem.select_option(**attempt)
-                            filled += 1
-                            logger.info("greenhouse_country_filled", attempt=attempt)
-                            break
-                        except Exception:
-                            continue
-                    break
+            country_input = await page.query_selector('#country')
+            if not country_input:
+                # Fallback selectors for different Greenhouse themes
+                for sel in ['input[id*="country"]', '.select__input', '[aria-labelledby="country-label"]']:
+                    country_input = await page.query_selector(sel)
+                    if country_input:
+                        break
 
-            # Fallback: find any select inside a container labeled "Country"
-            if filled == 0:
-                country_label = await page.query_selector('label:has-text("Country")')
-                if country_label:
-                    parent = await country_label.evaluate_handle("el => el.closest('.field') || el.parentElement")
-                    if parent:
-                        sel_elem = await parent.query_selector("select")
-                        if sel_elem:
-                            for attempt in [{"label": "United States +1"}, {"label": "United States"}, {"value": "US"}, {"value": "1"}]:
-                                try:
-                                    await sel_elem.select_option(**attempt)
-                                    filled += 1
-                                    logger.info("greenhouse_country_filled_by_label", attempt=attempt)
-                                    break
-                                except Exception:
-                                    continue
+            if country_input:
+                await country_input.click()
+                await asyncio.sleep(0.3)
+                await country_input.fill("United States")
+                await asyncio.sleep(0.8)  # Wait for dropdown options to filter
+                await page.keyboard.press("ArrowDown")
+                await asyncio.sleep(0.2)
+                await page.keyboard.press("Enter")
+                filled += 1
+                logger.info("greenhouse_country_filled_react_select")
+            else:
+                # Last resort: try native <select> elements
+                for sel in ['select[name*="country"]', 'select[id*="country"]']:
+                    elem = await page.query_selector(sel)
+                    if elem:
+                        for attempt in [{"label": "United States +1"}, {"label": "United States"}, {"value": "US"}]:
+                            try:
+                                await elem.select_option(**attempt)
+                                filled += 1
+                                logger.info("greenhouse_country_filled_native", attempt=attempt)
+                                break
+                            except Exception:
+                                continue
+                        break
         except Exception as e:
             logger.debug("greenhouse_country_widget_failed", error=str(e))
 
