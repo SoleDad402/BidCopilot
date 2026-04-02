@@ -1118,67 +1118,41 @@ async def api_autobid_preview(body: dict, request: Request):
 
 @app.post("/api/autobid/generate-answer")
 async def api_autobid_generate(body: dict, request: Request):
-    """Generate an LLM answer for a custom question."""
+    """Generate an LLM answer by proxying to CVCopilot's generate-answer endpoint.
+
+    CVCopilot has full access to the user's profile (employment history,
+    education, skills) and produces better, more personalized answers.
+    """
     question = body.get("question", "")
-    job_title = body.get("job_title", "")
-    company = body.get("company", "")
-    job_description = body.get("job_description", "")
     if not question:
         raise HTTPException(400, "question is required")
 
-    profile = await _load_autobid_profile(request)
+    token = getattr(request.state, "token", None)
+    if not token:
+        raise HTTPException(401, "Authentication required")
 
     import httpx
-    import os
-
-    # Load API key from .env.local if not in environment
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        try:
-            from pathlib import Path
-            env_file = Path(".env.local")
-            if env_file.exists():
-                for line in env_file.read_text().splitlines():
-                    if line.startswith("OPENAI_API_KEY="):
-                        api_key = line.split("=", 1)[1].strip()
-                        break
-        except Exception:
-            pass
-    if not api_key:
-        raise HTTPException(500, "OPENAI_API_KEY not configured")
-
-    prompt = f"""Answer this job application question in 2-4 sentences. Be specific and genuine.
-
-Question: {question}
-Role: {job_title} at {company}
-Job description excerpt: {job_description[:1500]}
-
-Candidate: {profile.full_name}, {profile.current_title}
-Experience: {profile.years_of_experience} years
-Skills: {', '.join(s.name for s in profile.skills[:10])}
-
-Write the answer:"""
-
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
+                f"{_config.cvcopilot_url}/api/v1/autobid/generate-answer",
+                headers={"Authorization": f"Bearer {token}"},
                 json={
-                    "model": "gpt-4o-mini",
-                    "temperature": 0.7,
-                    "max_tokens": 400,
-                    "messages": [
-                        {"role": "system", "content": "You are filling out a job application. Write concise, genuine answers. Never use clichés."},
-                        {"role": "user", "content": prompt},
-                    ],
+                    "question": question,
+                    "company": body.get("company", ""),
+                    "job_title": body.get("job_title", ""),
+                    "job_description": body.get("job_description", ""),
+                    "sample_answers": body.get("sample_answers", []),
                 },
             )
-            data = resp.json()
-            answer = data["choices"][0]["message"]["content"].strip()
-            return {"answer": answer}
-    except Exception as e:
-        raise HTTPException(500, f"LLM generation failed: {e}")
+            if resp.status_code != 200:
+                detail = resp.json().get("error", resp.text[:200])
+                raise HTTPException(resp.status_code, f"CVCopilot error: {detail}")
+            return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(503, "CVCopilot service unavailable")
+    except httpx.TimeoutException:
+        raise HTTPException(504, "CVCopilot generation timed out")
 
 
 @app.post("/api/autobid/test")
