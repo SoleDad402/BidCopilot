@@ -48,7 +48,7 @@ class Config(BaseSettings):
     db_path: str = "data/bidcopilot.db"
     profile_path: str = "config/profile.yaml"
     settings_path: str = "config/settings.yaml"
-    cvcopilot_url: str = "https://cvcopilot-production.up.railway.app"
+    cvcopilot_url: str = "https://cvcopilot-production-e809.up.railway.app"
     auth_enabled: bool = True
     discovery_config_path: str = "config/discovery.yaml"
     enabled_sites: list[str] = Field(
@@ -68,4 +68,4 @@ class Config(BaseSettings):
     matching: MatchingConfig = Field(default_factory=MatchingConfig)
     workers: WorkerPoolConfig = Field(default_factory=WorkerPoolConfig)
     notifications: NotificationConfig = Field(default_factory=NotificationConfig)
-    model_config = {"env_prefix": "BIDCOPILOT_", "env_nested_delimiter": "__"}
+    model_config = {"env_prefix": "BIDCOPILOT_", "env_nested_delimiter": "__", "env_file": ".env.local", "env_file_encoding": "utf-8"}
