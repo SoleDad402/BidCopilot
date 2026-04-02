@@ -405,6 +405,70 @@ def sources_add(company: str, url: str):
     _run(_add())
 
 
+# --- Apply command (auto-bid with browser) ---
+@app.command()
+def apply(
+    job_url: str = typer.Argument(..., help="Greenhouse job URL"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Extract and map only, no browser"),
+    pause: bool = typer.Option(True, "--pause/--no-pause", help="Pause before submit for review"),
+    headless: bool = typer.Option(False, "--headless/--no-headless", help="Run browser in headless mode"),
+):
+    """Auto-bid on a job: extract, generate resume, fill form, and submit.
+
+    By default opens a visible browser and pauses before submitting so you can
+    review the filled form. Press the Resume button in Playwright Inspector to submit.
+
+    Examples:
+      bidcopilot apply "https://boards.greenhouse.io/figma/jobs/123456"
+      bidcopilot apply "https://boards.greenhouse.io/figma/jobs/123456" --no-pause
+      bidcopilot apply "https://boards.greenhouse.io/figma/jobs/123456" --dry-run
+    """
+    configure_logging()
+
+    async def _apply():
+        from bidcopilot.config import Config
+        from bidcopilot.profile.manager import ProfileManager
+        from bidcopilot.application.platforms.greenhouse import GreenhouseBidEngine
+
+        config = Config()
+        pm = ProfileManager(config.profile_path)
+        profile = pm.load()
+
+        typer.echo(f"Profile: {profile.full_name} ({profile.email})")
+        typer.echo(f"Job URL: {job_url}")
+        typer.echo(f"Mode: {'dry-run' if dry_run else 'pause-before-submit' if pause else 'auto-submit'}")
+        typer.echo(f"Browser: {'headless' if headless else 'visible'}")
+        typer.echo()
+
+        engine = GreenhouseBidEngine(headless=headless)
+
+        if dry_run:
+            result = await engine.apply(job_url=job_url, profile=profile, dry_run=True)
+        else:
+            result = await engine.apply(
+                job_url=job_url,
+                profile=profile,
+                pause_before_submit=pause,
+            )
+
+        typer.echo()
+        typer.echo(f"{'SUCCESS' if result.success else 'FAILED'}: {result.job_title} at {result.company}")
+        typer.echo(f"  Fields filled: {result.fields_filled}")
+        typer.echo(f"  Questions answered: {result.questions_answered}")
+        if result.resume_path:
+            typer.echo(f"  Resume: {result.resume_path}")
+        if result.cover_letter_path:
+            typer.echo(f"  Cover letter: {result.cover_letter_path}")
+        if result.screenshot_path:
+            typer.echo(f"  Screenshot: {result.screenshot_path}")
+        if result.confirmation_text:
+            typer.echo(f"  Confirmation: {result.confirmation_text}")
+        if result.error:
+            typer.echo(f"  Error: {result.error}")
+
+    _run(_apply())
+
+
 # --- Dashboard command ---
 @app.command()
 def dashboard(

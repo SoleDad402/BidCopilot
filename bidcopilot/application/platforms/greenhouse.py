@@ -195,8 +195,18 @@ class GreenhouseBidEngine(BasePlatformEngine):
         resume_path: str | None = None,
         cover_letter_path: str | None = None,
         dry_run: bool = False,
+        pause_before_submit: bool = False,
+        on_pause: callable | None = None,
     ) -> BidResult:
         """Navigate to the Greenhouse job page, fill the form, and submit.
+
+        Args:
+            pause_before_submit: If True, fill the form but wait for
+                confirmation before clicking submit. The browser stays
+                open so you can review the filled form.
+            on_pause: Async callback invoked when paused. Receives
+                (page, job, field_map) and should return True to submit
+                or False to abort.
 
         Steps:
           1. Extract job metadata via API (title, description, questions).
@@ -206,7 +216,8 @@ class GreenhouseBidEngine(BasePlatformEngine):
           4. Use LLM for custom / open-ended questions.
           5. Open the job page in a browser context.
           6. Fill every field, upload resume (+ optional cover letter).
-          7. Submit (unless ``dry_run`` is True).
+          7. Pause for review (if requested).
+          8. Submit (unless ``dry_run`` is True or user aborts).
         """
         # Step 1 — extract job metadata
         try:
@@ -265,17 +276,52 @@ class GreenhouseBidEngine(BasePlatformEngine):
             # Step 6 — fill fields
             filled = await self._fill_form(page, job, field_map, resume_path, cover_letter_path)
 
-            # Step 7 — submit
-            result = await self._submitter.submit(
-                page,
-                submit_selector="#submit_app, button[type=submit], input[type=submit]",
-            )
+            # Take screenshot of filled form
             screenshot = None
             try:
+                Path("data/screenshots").mkdir(parents=True, exist_ok=True)
                 screenshot = f"data/screenshots/greenhouse_{job.job_id}.png"
                 await page.screenshot(path=screenshot, full_page=True)
             except Exception:
                 screenshot = None
+
+            # Step 7 — pause for review if requested
+            if pause_before_submit:
+                logger.info("greenhouse_paused", job_id=job.job_id, title=job.title)
+                should_submit = True
+                if on_pause:
+                    should_submit = await on_pause(page, job, field_map)
+                else:
+                    # Default: use Playwright's pause() which opens inspector
+                    await page.pause()
+                    should_submit = True  # If they close inspector, proceed
+
+                if not should_submit:
+                    return BidResult(
+                        success=False,
+                        job_id=job.job_id,
+                        job_title=job.title,
+                        company=job.company,
+                        confirmation_text="Aborted by user after review",
+                        screenshot_path=screenshot,
+                        fields_filled=filled,
+                        questions_answered=questions_answered,
+                        resume_path=resume_path,
+                        cover_letter_path=cover_letter_path,
+                    )
+
+            # Step 8 — submit
+            result = await self._submitter.submit(
+                page,
+                submit_selector="#submit_app, button[type=submit], input[type=submit]",
+            )
+
+            # Take post-submit screenshot
+            try:
+                post_screenshot = f"data/screenshots/greenhouse_{job.job_id}_submitted.png"
+                await page.screenshot(path=post_screenshot, full_page=True)
+            except Exception:
+                pass
 
             return BidResult(
                 success=result.get("success", False),

@@ -1038,6 +1038,51 @@ async def discovery_settings_page(request: Request):
     return templates.TemplateResponse(request, "discovery_settings.html", _template_ctx(request, active_page="discovery"))
 
 
+# ───── Auto-Bid Test ─────
+
+@app.get("/autobid", response_class=HTMLResponse)
+async def autobid_page(request: Request):
+    return templates.TemplateResponse(request, "autobid.html", _template_ctx(request, active_page="autobid"))
+
+
+@app.post("/api/autobid/test")
+async def api_autobid_test(body: dict, request: Request):
+    """Run a Greenhouse auto-bid in pause mode. Opens a visible browser,
+    fills the form, and pauses so the user can review."""
+    job_url = body.get("job_url", "")
+    if not job_url:
+        raise HTTPException(400, "job_url is required")
+
+    from bidcopilot.application.platforms.greenhouse import GreenhouseBidEngine
+    from bidcopilot.profile.manager import ProfileManager
+
+    pm = ProfileManager(_config.profile_path)
+    profile = pm.load()
+
+    engine = GreenhouseBidEngine(headless=False)
+
+    mode = body.get("mode", "pause")  # pause | dry_run | submit
+    result = await engine.apply(
+        job_url=job_url,
+        profile=profile,
+        dry_run=(mode == "dry_run"),
+        pause_before_submit=(mode == "pause"),
+    )
+
+    return {
+        "success": result.success,
+        "job_title": result.job_title,
+        "company": result.company,
+        "fields_filled": result.fields_filled,
+        "questions_answered": result.questions_answered,
+        "resume_path": result.resume_path,
+        "cover_letter_path": result.cover_letter_path,
+        "screenshot_path": result.screenshot_path,
+        "confirmation": result.confirmation_text,
+        "error": result.error,
+    }
+
+
 # ───── Startup ─────
 
 _server_start_time: float = 0

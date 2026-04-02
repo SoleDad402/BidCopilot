@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Auto-Bid Test — BidCopilot{% endblock %}
+
+{% block body %}
+<div style="max-width:800px;margin:0 auto;padding:24px;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(145deg,#0f172a,#1e1b4b 50%,#4338ca);border-radius:16px;padding:32px;margin-bottom:24px;color:#fff;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+      <span style="font-size:24px;">&#128640;</span>
+      <h2 style="margin:0;font-size:1.5rem;font-weight:700;">Auto-Bid Test</h2>
+      <span style="background:rgba(255,255,255,0.15);padding:2px 10px;border-radius:4px;font-size:0.75rem;font-weight:600;">Greenhouse</span>
+    </div>
+    <p style="opacity:0.7;font-size:0.875rem;margin:0;">
+      Paste a Greenhouse job URL. The engine will extract the job, generate a tailored resume, open a browser,
+      fill the form, and <strong>pause</strong> so you can review before submitting.
+    </p>
+  </div>
+
+  <!-- URL Input -->
+  <div class="card" style="padding:20px;margin-bottom:20px;">
+    <div style="display:flex;gap:12px;align-items:stretch;">
+      <input type="text" id="jobUrl" placeholder="https://boards.greenhouse.io/company/jobs/123456"
+        style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:0.875rem;font-family:inherit;outline:none;transition:border-color 0.2s;"
+        onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='var(--border)'"
+      >
+      <select id="modeSelect" style="padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:0.875rem;font-family:inherit;background:#fff;cursor:pointer;">
+        <option value="pause">Fill & Pause (review before submit)</option>
+        <option value="dry_run">Dry Run (no browser)</option>
+        <option value="submit">Fill & Submit (no pause)</option>
+      </select>
+      <button id="runBtn" onclick="runAutoBid()"
+        style="padding:10px 24px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:0.875rem;cursor:pointer;white-space:nowrap;font-family:inherit;">
+        Run
+      </button>
+    </div>
+    <div id="progress" style="display:none;margin-top:12px;">
+      <div style="height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+        <div id="progressBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);transition:width 0.5s;border-radius:4px;"></div>
+      </div>
+      <p id="progressText" style="font-size:0.8rem;color:var(--text-secondary);margin-top:6px;"></p>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div id="result" style="display:none;"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runAutoBid() {
+  const url = document.getElementById('jobUrl').value.trim();
+  if (!url) return;
+
+  const mode = document.getElementById('modeSelect').value;
+  const btn = document.getElementById('runBtn');
+  const progress = document.getElementById('progress');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  const result = document.getElementById('result');
+
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  progress.style.display = 'block';
+  result.style.display = 'none';
+  progressBar.style.width = '10%';
+
+  const steps = [
+    { pct: 10, text: 'Extracting job metadata...' },
+    { pct: 30, text: 'Generating tailored resume via CVCopilot...' },
+    { pct: 60, text: 'Opening browser and filling form...' },
+    { pct: 80, text: mode === 'pause' ? 'Form filled — paused for your review. Check the browser window.' : 'Submitting...' },
+  ];
+
+  let step = 0;
+  const interval = setInterval(() => {
+    if (step < steps.length) {
+      progressBar.style.width = steps[step].pct + '%';
+      progressText.textContent = steps[step].text;
+      step++;
+    }
+  }, 2000);
+
+  try {
+    const resp = await fetch('/api/autobid/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_url: url, mode }),
+    });
+    const data = await resp.json();
+    clearInterval(interval);
+    progressBar.style.width = '100%';
+    progressText.textContent = 'Done!';
+
+    const ok = data.success;
+    result.style.display = 'block';
+    result.innerHTML = `
+      <div class="card" style="padding:24px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+          <span style="font-size:20px;">${ok ? '&#9989;' : '&#10060;'}</span>
+          <h3 style="margin:0;font-size:1.1rem;">${data.job_title || 'Unknown'} at ${data.company || 'Unknown'}</h3>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.875rem;">
+          <div><strong>Status:</strong> ${ok ? '<span style="color:#10b981">Success</span>' : '<span style="color:#ef4444">Failed</span>'}</div>
+          <div><strong>Fields filled:</strong> ${data.fields_filled || 0}</div>
+          <div><strong>Questions answered:</strong> ${data.questions_answered || 0}</div>
+          ${data.resume_path ? `<div><strong>Resume:</strong> ${data.resume_path}</div>` : ''}
+          ${data.cover_letter_path ? `<div><strong>Cover letter:</strong> ${data.cover_letter_path}</div>` : ''}
+          ${data.screenshot_path ? `<div><strong>Screenshot:</strong> ${data.screenshot_path}</div>` : ''}
+          ${data.confirmation ? `<div style="grid-column:span 2"><strong>Confirmation:</strong> ${data.confirmation}</div>` : ''}
+          ${data.error ? `<div style="grid-column:span 2;color:#ef4444"><strong>Error:</strong> ${data.error}</div>` : ''}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    clearInterval(interval);
+    progressBar.style.width = '100%';
+    progressBar.style.background = '#ef4444';
+    progressText.textContent = 'Failed: ' + err.message;
+    result.style.display = 'block';
+    result.innerHTML = `<div class="card" style="padding:20px;color:#ef4444;">Error: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run';
+  }
+}
+
+// Enter key triggers run
+document.getElementById('jobUrl').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runAutoBid();
+});
+</script>
+{% endblock %}
