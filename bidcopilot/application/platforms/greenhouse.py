@@ -396,7 +396,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
             cl_bytes = response.get_cover_letter_bytes()
             if cl_bytes:
                 base = response.filename.rsplit(".", 1)[0]
-                cl_filename = f"{base}_cover_letter.txt"
+                cl_filename = f"{base}_cover_letter.docx"
                 cover_letter_path = str(output_dir / cl_filename)
                 with open(cover_letter_path, "wb") as f:
                     f.write(cl_bytes)
