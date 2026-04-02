@@ -372,7 +372,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
                 job_title=job.title,
                 company_name=job.company,
                 target_keywords=[s.name for s in profile.skills[:15]],
-                format="docx",
+                format="pdf",
                 include_cover_letter=True,
             )
 
@@ -464,7 +464,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
                         answer = self._answer_yes_no(label, profile)
                         for v in values:
                             if v.get("label", "").lower() == answer:
-                                field_map[fname] = str(v.get("value", v.get("label")))
+                                field_map[fname] = str(v.get("label", v.get("value", "")))
                                 break
                         continue
 
@@ -509,14 +509,14 @@ class GreenhouseBidEngine(BasePlatformEngine):
             target = "no" if profile.visa_sponsorship_needed else "yes"
             for v in values:
                 if v.get("label", "").lower().startswith(target):
-                    return str(v.get("value", v.get("label")))
+                    return str(v.get("label", v.get("value", "")))
 
         # Remote / on-site preference
         if any(kw in label_lower for kw in ("remote", "work model", "on-site", "onsite")):
             pref = profile.remote_preference.replace("_", " ")
             for v in values:
                 if pref in v.get("label", "").lower():
-                    return str(v.get("value", v.get("label")))
+                    return str(v.get("label", v.get("value", "")))
             # Fallback to first option
             return str(values[0].get("value", values[0].get("label"))) if values else None
 
@@ -527,9 +527,9 @@ class GreenhouseBidEngine(BasePlatformEngine):
                 text = v.get("label", "")
                 nums = [int(n) for n in re.findall(r"\d+", text)]
                 if len(nums) == 2 and nums[0] <= yoe <= nums[1]:
-                    return str(v.get("value", v.get("label")))
+                    return str(v.get("label", v.get("value", "")))
                 if len(nums) == 1 and "+" in text and yoe >= nums[0]:
-                    return str(v.get("value", v.get("label")))
+                    return str(v.get("label", v.get("value", "")))
             # Pick the highest range if we exceed all
             if values:
                 return str(values[-1].get("value", values[-1].get("label")))
@@ -540,14 +540,14 @@ class GreenhouseBidEngine(BasePlatformEngine):
                 for v in values:
                     nums = [int(n.replace(",", "")) for n in re.findall(r"[\d,]+", v.get("label", ""))]
                     if len(nums) >= 2 and nums[0] <= profile.min_salary <= nums[1]:
-                        return str(v.get("value", v.get("label")))
+                        return str(v.get("label", v.get("value", "")))
 
         # How did you hear about us — pick first non-empty option
         if "hear" in label_lower or "how did you" in label_lower or "source" in label_lower:
             for v in values:
                 lbl = v.get("label", "").lower()
                 if any(kw in lbl for kw in ("linkedin", "job board", "website", "online")):
-                    return str(v.get("value", v.get("label")))
+                    return str(v.get("label", v.get("value", "")))
             return str(values[0].get("value", values[0].get("label"))) if values else None
 
         return None
