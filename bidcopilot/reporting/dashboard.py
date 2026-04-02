@@ -1101,10 +1101,17 @@ async def api_autobid_preview(body: dict, request: Request):
             continue
         seen_labels.add(label)
 
-        source = "file" if is_file else "profile" if value and value != "NEEDS_HUMAN_INPUT" else "needs_input"
+        # For UI display: extract label from select dicts, keep strings as-is
+        display_value = ""
+        if isinstance(value, dict) and value.get("type") == "select":
+            display_value = value.get("label", "")
+        elif isinstance(value, str) and value != "NEEDS_HUMAN_INPUT":
+            display_value = value
+
+        source = "file" if is_file else "profile" if display_value else "needs_input"
         fields.append({
             "name": fname, "label": label, "type": ftype,
-            "value": value if value != "NEEDS_HUMAN_INPUT" else "",
+            "value": display_value,
             "source": source, "required": required, "options": values,
         })
 
