@@ -197,6 +197,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
         dry_run: bool = False,
         pause_before_submit: bool = False,
         on_pause: callable | None = None,
+        custom_answers: dict[str, str] | None = None,
     ) -> BidResult:
         """Navigate to the Greenhouse job page, fill the form, and submit.
 
@@ -247,6 +248,13 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
         # Step 3+4 — build the complete field map
         field_map, questions_answered = await self._build_field_map(job, profile)
+
+        # Inject user-provided custom answers (from dashboard review panel)
+        if custom_answers:
+            for fname, answer in custom_answers.items():
+                if answer and answer.strip():
+                    field_map[fname] = answer
+            logger.info("greenhouse_custom_answers_injected", count=len(custom_answers))
 
         if dry_run:
             logger.info("greenhouse_dry_run", fields=len(field_map), questions=questions_answered)
@@ -693,6 +701,30 @@ class GreenhouseBidEngine(BasePlatformEngine):
                         return True
                     except Exception:
                         pass
+                # Try selecting by index for numeric values
+                try:
+                    idx = int(value)
+                    options = await elem.query_selector_all("option")
+                    if 0 <= idx < len(options):
+                        opt_value = await options[idx].get_attribute("value")
+                        if opt_value:
+                            await elem.select_option(value=opt_value)
+                            return True
+                except (ValueError, Exception):
+                    pass
+                # Last resort: try partial text match
+                try:
+                    options = await elem.query_selector_all("option")
+                    val_lower = value.lower()
+                    for opt in options:
+                        text = (await opt.inner_text()).strip().lower()
+                        if val_lower in text or text in val_lower:
+                            opt_value = await opt.get_attribute("value")
+                            if opt_value:
+                                await elem.select_option(value=opt_value)
+                                return True
+                except Exception:
+                    pass
                 logger.warning("greenhouse_select_failed", field=fname, value=value)
                 return False
             elif tag == "textarea" or input_type in ("text", "email", "tel", "url", "number", ""):

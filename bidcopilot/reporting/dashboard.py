@@ -1167,21 +1167,13 @@ async def api_autobid_test(body: dict, request: Request):
     profile = await _load_autobid_profile(request)
     engine = GreenhouseBidEngine(headless=False)
 
-    # Extract and build field map, then inject custom answers
-    job = await engine.extract_job(job_url)
-    field_map, _ = await engine._build_field_map(job, profile)
-
-    # Override with user-provided custom answers
-    for fname, answer in custom_answers.items():
-        if answer and answer.strip():
-            field_map[fname] = answer
-
     mode = body.get("mode", "pause")
     result = await engine.apply(
         job_url=job_url,
         profile=profile,
         dry_run=(mode == "dry_run"),
         pause_before_submit=(mode == "pause"),
+        custom_answers=custom_answers,
     )
 
     return {
