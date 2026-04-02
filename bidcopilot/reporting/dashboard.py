@@ -1072,7 +1072,10 @@ async def api_autobid_preview(body: dict, request: Request):
     profile = await _load_autobid_profile(request)
     engine = GreenhouseBidEngine()
 
-    job = await engine.extract_job(job_url)
+    try:
+        job = await engine.extract_job(job_url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     field_map, custom_count = await engine._build_field_map(job, profile)
 
     # Categorize fields for the UI — one entry per question, not per sub-field
