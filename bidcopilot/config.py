@@ -68,4 +68,4 @@ class Config(BaseSettings):
     matching: MatchingConfig = Field(default_factory=MatchingConfig)
     workers: WorkerPoolConfig = Field(default_factory=WorkerPoolConfig)
     notifications: NotificationConfig = Field(default_factory=NotificationConfig)
-    model_config = {"env_prefix": "BIDCOPILOT_", "env_nested_delimiter": "__", "env_file": ".env.local", "env_file_encoding": "utf-8"}
+    model_config = {"env_prefix": "BIDCOPILOT_", "env_nested_delimiter": "__", "env_file": ".env.local", "env_file_encoding": "utf-8", "extra": "ignore"}
