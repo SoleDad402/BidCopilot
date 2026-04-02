@@ -372,7 +372,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
                 job_title=job.title,
                 company_name=job.company,
                 target_keywords=[s.name for s in profile.skills[:15]],
-                format="pdf",
+                format="docx",
                 include_cover_letter=True,
             )
 
@@ -395,7 +395,8 @@ class GreenhouseBidEngine(BasePlatformEngine):
             cover_letter_path = None
             cl_bytes = response.get_cover_letter_bytes()
             if cl_bytes:
-                cl_filename = response.filename.replace(".pdf", "_cover_letter.txt")
+                base = response.filename.rsplit(".", 1)[0]
+                cl_filename = f"{base}_cover_letter.txt"
                 cover_letter_path = str(output_dir / cl_filename)
                 with open(cover_letter_path, "wb") as f:
                     f.write(cl_bytes)
