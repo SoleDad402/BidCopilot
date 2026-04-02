@@ -462,9 +462,9 @@ class GreenhouseBidEngine(BasePlatformEngine):
                     labels_lower = {v.get("label", "").lower() for v in values}
                     if labels_lower == {"yes", "no"}:
                         answer = await self._answer_yes_no(label, profile)
-                        for v in values:
+                        for i, v in enumerate(values):
                             if v.get("label", "").lower() == answer:
-                                field_map[fname] = str(v.get("label", v.get("value", "")))
+                                field_map[fname] = {"label": v.get("label", ""), "index": i, "type": "select"}
                                 break
                         continue
 
@@ -499,56 +499,54 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
     def _pick_dropdown(
         self, label: str, values: list[dict], profile: UserProfile
-    ) -> str | None:
-        """Heuristically pick a dropdown option based on label & profile."""
+    ) -> dict | None:
+        """Pick a dropdown option. Returns {"label", "index", "type": "select"} or None."""
         label_lower = label.lower()
-        option_labels = [v.get("label", "") for v in values]
+
+        def _make(i: int) -> dict:
+            return {"label": values[i].get("label", ""), "index": i, "type": "select"}
+
+        def _find(predicate) -> dict | None:
+            for i, v in enumerate(values):
+                if predicate(v.get("label", "")):
+                    return _make(i)
+            return None
 
         # Work authorization
         if any(kw in label_lower for kw in ("authorized", "authorization", "legally", "sponsorship")):
             target = "no" if profile.visa_sponsorship_needed else "yes"
-            for v in values:
-                if v.get("label", "").lower().startswith(target):
-                    return str(v.get("label", v.get("value", "")))
+            return _find(lambda lbl: lbl.lower().startswith(target))
 
         # Remote / on-site preference
         if any(kw in label_lower for kw in ("remote", "work model", "on-site", "onsite")):
             pref = profile.remote_preference.replace("_", " ")
-            for v in values:
-                if pref in v.get("label", "").lower():
-                    return str(v.get("label", v.get("value", "")))
-            # Fallback to first option
-            return str(values[0].get("value", values[0].get("label"))) if values else None
+            result = _find(lambda lbl: pref in lbl.lower())
+            return result or (_make(0) if values else None)
 
-        # Years of experience ranges (e.g. "3-5 years", "5-10 years")
+        # Years of experience ranges
         if "experience" in label_lower or "years" in label_lower:
             yoe = profile.years_of_experience
-            for v in values:
+            for i, v in enumerate(values):
                 text = v.get("label", "")
                 nums = [int(n) for n in re.findall(r"\d+", text)]
                 if len(nums) == 2 and nums[0] <= yoe <= nums[1]:
-                    return str(v.get("label", v.get("value", "")))
+                    return _make(i)
                 if len(nums) == 1 and "+" in text and yoe >= nums[0]:
-                    return str(v.get("label", v.get("value", "")))
-            # Pick the highest range if we exceed all
-            if values:
-                return str(values[-1].get("value", values[-1].get("label")))
+                    return _make(i)
+            return _make(len(values) - 1) if values else None
 
         # Salary range
         if "salary" in label_lower or "compensation" in label_lower:
             if profile.min_salary:
-                for v in values:
+                for i, v in enumerate(values):
                     nums = [int(n.replace(",", "")) for n in re.findall(r"[\d,]+", v.get("label", ""))]
                     if len(nums) >= 2 and nums[0] <= profile.min_salary <= nums[1]:
-                        return str(v.get("label", v.get("value", "")))
+                        return _make(i)
 
-        # How did you hear about us — pick first non-empty option
+        # How did you hear about us
         if "hear" in label_lower or "how did you" in label_lower or "source" in label_lower:
-            for v in values:
-                lbl = v.get("label", "").lower()
-                if any(kw in lbl for kw in ("linkedin", "job board", "website", "online")):
-                    return str(v.get("label", v.get("value", "")))
-            return str(values[0].get("value", values[0].get("label"))) if values else None
+            result = _find(lambda lbl: any(kw in lbl.lower() for kw in ("linkedin", "job board", "website", "online")))
+            return result or (_make(0) if values else None)
 
         return None
 
@@ -625,7 +623,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
         # --- Pass 1: match by field name ---
         for fname, value in field_map.items():
-            if value in ("SKIP", "NEEDS_HUMAN_INPUT"):
+            if isinstance(value, str) and value in ("SKIP", "NEEDS_HUMAN_INPUT"):
                 continue
 
             selectors = [
@@ -779,9 +777,18 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
         return filled
 
-    async def _fill_element(self, page, elem, value: str, fname: str) -> bool:
-        """Fill a single form element with a value. Returns True on success."""
+    async def _fill_element(self, page, elem, value, fname: str) -> bool:
+        """Fill a single form element with a value.
+
+        ``value`` can be:
+        - str: plain text to type
+        - dict with {"label", "index", "type": "select"}: select option by index
+        """
         try:
+            # If value is a select dict with index, use ArrowDown approach directly
+            if isinstance(value, dict) and value.get("type") == "select":
+                return await self._fill_select_by_index(page, elem, value["index"], value["label"], fname)
+
             tag = await elem.evaluate("el => el.tagName.toLowerCase()")
             input_type = await elem.get_attribute("type") or ""
             role = await elem.get_attribute("role") or ""
@@ -804,7 +811,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
             elif tag == "textarea" or input_type in ("text", "email", "tel", "url", "number", ""):
                 await elem.click()
                 await elem.fill("")
-                await elem.type(value, delay=random.uniform(30, 80))
+                await elem.type(str(value), delay=random.uniform(30, 80))
                 return True
             elif input_type in ("checkbox", "radio"):
                 await elem.check()
@@ -812,6 +819,26 @@ class GreenhouseBidEngine(BasePlatformEngine):
         except Exception as e:
             logger.warning("greenhouse_fill_error", field=fname, error=str(e))
         return False
+
+    async def _fill_select_by_index(self, page, elem, index: int, label: str, fname: str) -> bool:
+        """Select an option by its exact index. Click → ArrowDown × (index+1) → Enter."""
+        try:
+            await elem.click()
+            await asyncio.sleep(0.4)
+            for _ in range(index + 1):
+                await page.keyboard.press("ArrowDown")
+                await asyncio.sleep(0.1)
+            await page.keyboard.press("Enter")
+            await asyncio.sleep(0.2)
+            logger.debug("greenhouse_select_by_index", field=fname, label=label, index=index)
+            return True
+        except Exception as e:
+            logger.warning("greenhouse_select_by_index_failed", field=fname, error=str(e))
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+            return False
 
     async def _fill_react_select(self, page, elem, value: str, fname: str) -> bool:
         """Fill a React Select component by finding the option position and using ArrowDown.
