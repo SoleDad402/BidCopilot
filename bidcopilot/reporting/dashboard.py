@@ -1075,23 +1075,35 @@ async def api_autobid_preview(body: dict, request: Request):
     job = await engine.extract_job(job_url)
     field_map, custom_count = await engine._build_field_map(job, profile)
 
-    # Categorize fields for the UI
+    # Categorize fields for the UI — one entry per question, not per sub-field
     fields = []
+    seen_labels = set()
     for q in job.questions:
         label = q.get("label", "").strip()
         required = q.get("required", False)
-        for f in q.get("fields", []):
-            fname = f.get("name", "")
-            ftype = f.get("type", "")
-            values = [v.get("label", "") for v in f.get("values", [])]
-            value = field_map.get(fname, "")
-            is_file = ftype == "input_file"
-            source = "file" if is_file else "profile" if value and value != "NEEDS_HUMAN_INPUT" else "needs_input"
-            fields.append({
-                "name": fname, "label": label, "type": ftype,
-                "value": value if value != "NEEDS_HUMAN_INPUT" else "",
-                "source": source, "required": required, "options": values,
-            })
+        q_fields = q.get("fields", [])
+        if not q_fields:
+            continue
+
+        # Use the first field as representative
+        f = q_fields[0]
+        fname = f.get("name", "")
+        ftype = f.get("type", "")
+        values = [v.get("label", "") for v in f.get("values", [])]
+        value = field_map.get(fname, "")
+        is_file = ftype == "input_file"
+
+        # Skip duplicate labels (e.g. Resume/CV appears as both file + text)
+        if label in seen_labels:
+            continue
+        seen_labels.add(label)
+
+        source = "file" if is_file else "profile" if value and value != "NEEDS_HUMAN_INPUT" else "needs_input"
+        fields.append({
+            "name": fname, "label": label, "type": ftype,
+            "value": value if value != "NEEDS_HUMAN_INPUT" else "",
+            "source": source, "required": required, "options": values,
+        })
 
     return {
         "job": {
@@ -1117,6 +1129,24 @@ async def api_autobid_generate(body: dict, request: Request):
     profile = await _load_autobid_profile(request)
 
     import httpx
+    import os
+
+    # Load API key from .env.local if not in environment
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        try:
+            from pathlib import Path
+            env_file = Path(".env.local")
+            if env_file.exists():
+                for line in env_file.read_text().splitlines():
+                    if line.startswith("OPENAI_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        break
+        except Exception:
+            pass
+    if not api_key:
+        raise HTTPException(500, "OPENAI_API_KEY not configured")
+
     prompt = f"""Answer this job application question in 2-4 sentences. Be specific and genuine.
 
 Question: {question}
@@ -1133,7 +1163,7 @@ Write the answer:"""
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {__import__('os').environ.get('OPENAI_API_KEY', '')}"},
+                headers={"Authorization": f"Bearer {api_key}"},
                 json={
                     "model": "gpt-4o-mini",
                     "temperature": 0.7,
