@@ -25,6 +25,9 @@ env/
 .env.local
 .env.production
 
+# User profile (personal data — each user has their own)
+config/profile.yaml
+
 # Data
 data/
 *.db
