@@ -103,6 +103,9 @@
 let _job = null;
 let _fields = [];
 let _customAnswers = {}; // fname -> user-edited answer
+let _resumeText = ''; // generated resume text for answer context
+let _resumePath = null;
+let _coverLetterPath = null;
 
 async function doPreview() {
   const url = document.getElementById('jobUrl').value.trim();
@@ -116,8 +119,8 @@ async function doPreview() {
   btn.disabled = true;
   btn.textContent = 'Extracting...';
   progress.style.display = 'block';
-  bar.style.width = '30%';
-  text.textContent = 'Fetching job metadata and mapping fields...';
+  bar.style.width = '15%';
+  text.textContent = 'Extracting job metadata, generating resume...';
 
   try {
     const resp = await fetch('/api/autobid/preview', {
@@ -133,6 +136,9 @@ async function doPreview() {
     _job = data.job;
     _fields = data.fields;
     _customAnswers = {};
+    _resumeText = data.resume_text || '';
+    _resumePath = data.resume_path || null;
+    _coverLetterPath = data.cover_letter_path || null;
 
     renderJobCard();
     renderStats();
@@ -248,6 +254,7 @@ async function autoGen(fname, label) {
         job_title: _job.title,
         company: _job.company,
         job_description: _job.description || '',
+        resume_text: _resumeText,
       }),
     });
     const data = await resp.json();
@@ -358,7 +365,7 @@ async function launchBrowser(mode) {
     const resp = await fetch('/api/autobid/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_url: url, mode, custom_answers: _customAnswers }),
+      body: JSON.stringify({ job_url: url, mode, custom_answers: _customAnswers, resume_path: _resumePath, cover_letter_path: _coverLetterPath }),
     });
     const data = await resp.json();
     clearInterval(interval);

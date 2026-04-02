@@ -1108,6 +1108,19 @@ async def api_autobid_preview(body: dict, request: Request):
             "source": source, "required": required, "options": values,
         })
 
+    # Generate tailored resume via CVCopilot (for answer context + browser upload)
+    resume_text = ""
+    resume_path = None
+    cover_letter_path = None
+    try:
+        docs = await engine._generate_resume(job, profile)
+        resume_text = docs.resume_text
+        resume_path = docs.resume_path
+        cover_letter_path = docs.cover_letter_path
+        logger.info("autobid_preview_resume_generated", file=docs.filename)
+    except Exception as e:
+        logger.warning("autobid_preview_resume_failed", error=str(e))
+
     return {
         "job": {
             "job_id": job.job_id, "title": job.title, "company": job.company,
@@ -1116,6 +1129,9 @@ async def api_autobid_preview(body: dict, request: Request):
         },
         "fields": fields,
         "profile_name": profile.full_name,
+        "resume_text": resume_text,
+        "resume_path": resume_path,
+        "cover_letter_path": cover_letter_path,
     }
 
 
@@ -1146,6 +1162,7 @@ async def api_autobid_generate(body: dict, request: Request):
                     "job_title": body.get("job_title", ""),
                     "job_description": body.get("job_description", ""),
                     "sample_answers": body.get("sample_answers", []),
+                    "resume_text": body.get("resume_text", ""),
                 },
             )
             if resp.status_code != 200:
@@ -1162,7 +1179,9 @@ async def api_autobid_generate(body: dict, request: Request):
 async def api_autobid_test(body: dict, request: Request):
     """Run Greenhouse auto-bid with browser. Accepts pre-filled custom answers."""
     job_url = body.get("job_url", "")
-    custom_answers = body.get("custom_answers", {})  # fname -> answer
+    custom_answers = body.get("custom_answers", {})
+    resume_path = body.get("resume_path")  # pre-generated during preview
+    cover_letter_path = body.get("cover_letter_path")
     if not job_url:
         raise HTTPException(400, "job_url is required")
 
@@ -1174,6 +1193,8 @@ async def api_autobid_test(body: dict, request: Request):
     result = await engine.apply(
         job_url=job_url,
         profile=profile,
+        resume_path=resume_path,
+        cover_letter_path=cover_letter_path,
         dry_run=(mode == "dry_run"),
         pause_before_submit=(mode == "pause"),
         custom_answers=custom_answers,
