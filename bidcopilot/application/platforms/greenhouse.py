@@ -577,20 +577,29 @@ class GreenhouseBidEngine(BasePlatformEngine):
     ) -> int:
         """Fill the Greenhouse application form in the browser.
 
-        Greenhouse forms use varying selectors depending on the board type:
-        - Standard: ``[name="first_name"]``, ``#first_name``
-        - Embedded: ``[autocomplete="given-name"]``, ``[data-field="first_name"]``
-        - Custom questions: ``[name*="question_"]``, ``[id*="question_"]``
-
-        We try multiple selector strategies for each field.
+        Uses a two-pass strategy:
+        1. Try matching by API field name (name/id selectors).
+        2. For unmatched fields, find by label text on the page and fill
+           the associated input/select/textarea.
         """
         filled = 0
+        unfilled = {}  # fname -> value for label-based fallback
 
+        # --- Build a label->value map from the API questions for fallback ---
+        label_value_map = {}
+        for q in job.questions:
+            label = q.get("label", "").strip()
+            fields = q.get("fields", [])
+            for f in fields:
+                fname = f.get("name", "")
+                if fname in field_map:
+                    label_value_map[label] = field_map[fname]
+
+        # --- Pass 1: match by field name ---
         for fname, value in field_map.items():
             if value in ("SKIP", "NEEDS_HUMAN_INPUT"):
                 continue
 
-            # Build a list of selectors to try, from most specific to broadest
             selectors = [
                 f'[name="{fname}"]',
                 f'#{fname}',
@@ -610,35 +619,37 @@ class GreenhouseBidEngine(BasePlatformEngine):
                     continue
 
             if not elem:
-                logger.debug("greenhouse_field_not_found", name=fname, selectors=selectors[:3])
+                unfilled[fname] = value
                 continue
 
-            try:
-                tag = await elem.evaluate("el => el.tagName.toLowerCase()")
-                input_type = await elem.get_attribute("type") or ""
-
-                await asyncio.sleep(random.uniform(0.2, 0.8))
-
-                if tag == "select":
-                    # Try by value first, then by label
-                    try:
-                        await elem.select_option(value=value)
-                    except Exception:
-                        try:
-                            await elem.select_option(label=value)
-                        except Exception:
-                            logger.warning("greenhouse_select_failed", field=fname, value=value)
-                elif tag == "textarea" or input_type in ("text", "email", "tel", "url", "number", ""):
-                    await elem.click()
-                    await elem.fill("")
-                    await elem.type(value, delay=random.uniform(30, 80))
-                elif input_type in ("checkbox", "radio"):
-                    await elem.check()
-
+            if await self._fill_element(page, elem, value, fname):
                 filled += 1
-                logger.debug("greenhouse_field_filled", name=fname, tag=tag)
-            except Exception as e:
-                logger.warning("greenhouse_fill_error", field=fname, error=str(e))
+
+        # --- Pass 2: match unfilled fields by label text on page ---
+        if unfilled:
+            logger.info("greenhouse_label_fallback", count=len(unfilled))
+            for fname, value in unfilled.items():
+                # Find the label text for this field from the API questions
+                label_text = None
+                for q in job.questions:
+                    for f in q.get("fields", []):
+                        if f.get("name") == fname:
+                            label_text = q.get("label", "").strip()
+                            break
+                    if label_text:
+                        break
+
+                if not label_text:
+                    logger.debug("greenhouse_no_label_for_field", name=fname)
+                    continue
+
+                # Find label element on page by text content
+                try:
+                    elem = await self._find_field_by_label(page, label_text)
+                    if elem and await self._fill_element(page, elem, value, fname):
+                        filled += 1
+                except Exception as e:
+                    logger.debug("greenhouse_label_fill_failed", label=label_text, error=str(e))
 
         # Upload resume
         resume_uploaded = await self._upload_file(page, "resume", resume_path)
@@ -653,6 +664,87 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
         logger.info("greenhouse_form_filled", fields_filled=filled)
         return filled
+
+    async def _fill_element(self, page, elem, value: str, fname: str) -> bool:
+        """Fill a single form element with a value. Returns True on success."""
+        try:
+            tag = await elem.evaluate("el => el.tagName.toLowerCase()")
+            input_type = await elem.get_attribute("type") or ""
+
+            await asyncio.sleep(random.uniform(0.2, 0.8))
+
+            if tag == "select":
+                # Greenhouse selects: try value, then label, then partial label match
+                for strategy in ["value", "label"]:
+                    try:
+                        if strategy == "value":
+                            await elem.select_option(value=value)
+                        else:
+                            await elem.select_option(label=value)
+                        logger.debug("greenhouse_select_filled", field=fname, strategy=strategy)
+                        return True
+                    except Exception:
+                        continue
+                # Try matching "Yes"/"No" for numeric values like "1"/"0"
+                if value in ("1", "0"):
+                    try:
+                        label = "Yes" if value == "1" else "No"
+                        await elem.select_option(label=label)
+                        return True
+                    except Exception:
+                        pass
+                logger.warning("greenhouse_select_failed", field=fname, value=value)
+                return False
+            elif tag == "textarea" or input_type in ("text", "email", "tel", "url", "number", ""):
+                await elem.click()
+                await elem.fill("")
+                await elem.type(value, delay=random.uniform(30, 80))
+                return True
+            elif input_type in ("checkbox", "radio"):
+                await elem.check()
+                return True
+        except Exception as e:
+            logger.warning("greenhouse_fill_error", field=fname, error=str(e))
+        return False
+
+    async def _find_field_by_label(self, page, label_text: str):
+        """Find an input/select/textarea by its visible label text on the page.
+
+        Greenhouse forms use <label> elements or container divs with label text.
+        We find the label, then locate the associated form control.
+        """
+        # Strategy 1: find <label> containing text, use its "for" attribute
+        labels = await page.query_selector_all("label")
+        for label_elem in labels:
+            text = (await label_elem.inner_text()).strip()
+            # Remove trailing * (required marker)
+            text = text.rstrip("*").strip()
+            if text.lower() == label_text.lower():
+                for_attr = await label_elem.get_attribute("for")
+                if for_attr:
+                    target = await page.query_selector(f"#{for_attr}")
+                    if target:
+                        return target
+                # No "for" attr — look for input/select/textarea as sibling or child
+                parent = await label_elem.evaluate_handle("el => el.closest('.field') || el.parentElement")
+                if parent:
+                    for sel in ["input:not([type=hidden])", "select", "textarea"]:
+                        target = await parent.query_selector(sel)
+                        if target:
+                            return target
+
+        # Strategy 2: find container div with matching text, look for form control inside
+        containers = await page.query_selector_all(".field, .field-wrapper, [class*='field']")
+        for container in containers:
+            text = (await container.inner_text()).strip()
+            if label_text.lower() in text.lower():
+                for sel in ["input:not([type=hidden]):not([type=file])", "select", "textarea"]:
+                    target = await container.query_selector(sel)
+                    if target:
+                        return target
+
+        logger.debug("greenhouse_label_not_found", label=label_text)
+        return None
 
     async def _upload_file(self, page, field_hint: str, file_path: str) -> bool:
         """Upload a file to a Greenhouse file input.
