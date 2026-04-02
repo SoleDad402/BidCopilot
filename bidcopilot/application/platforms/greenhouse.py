@@ -784,55 +784,23 @@ class GreenhouseBidEngine(BasePlatformEngine):
         try:
             tag = await elem.evaluate("el => el.tagName.toLowerCase()")
             input_type = await elem.get_attribute("type") or ""
+            role = await elem.get_attribute("role") or ""
+            aria_haspopup = await elem.get_attribute("aria-haspopup") or ""
+            parent_class = await elem.evaluate("el => (el.closest('.select__container') || el.closest('[class*=\"select\"]') || {}).className || ''")
 
             await asyncio.sleep(random.uniform(0.2, 0.8))
 
-            if tag == "select":
-                # Greenhouse selects: try value, then label, then partial label match
-                for strategy in ["value", "label"]:
-                    try:
-                        if strategy == "value":
-                            await elem.select_option(value=value)
-                        else:
-                            await elem.select_option(label=value)
-                        logger.debug("greenhouse_select_filled", field=fname, strategy=strategy)
-                        return True
-                    except Exception:
-                        continue
-                # Try matching "Yes"/"No" for numeric values like "1"/"0"
-                if value in ("1", "0"):
-                    try:
-                        label = "Yes" if value == "1" else "No"
-                        await elem.select_option(label=label)
-                        return True
-                    except Exception:
-                        pass
-                # Try selecting by index for numeric values
-                try:
-                    idx = int(value)
-                    options = await elem.query_selector_all("option")
-                    if 0 <= idx < len(options):
-                        opt_value = await options[idx].get_attribute("value")
-                        if opt_value:
-                            await elem.select_option(value=opt_value)
-                            return True
-                except (ValueError, Exception):
-                    pass
-                # Last resort: try partial text match
-                try:
-                    options = await elem.query_selector_all("option")
-                    val_lower = value.lower()
-                    for opt in options:
-                        text = (await opt.inner_text()).strip().lower()
-                        if val_lower in text or text in val_lower:
-                            opt_value = await opt.get_attribute("value")
-                            if opt_value:
-                                await elem.select_option(value=opt_value)
-                                return True
-                except Exception:
-                    pass
-                logger.warning("greenhouse_select_failed", field=fname, value=value)
-                return False
+            # Detect React Select combobox
+            is_react_select = (
+                role == "combobox"
+                or aria_haspopup == "true"
+                or "select__" in parent_class
+            )
+
+            if is_react_select:
+                return await self._fill_react_select(page, elem, value, fname)
+            elif tag == "select":
+                return await self._fill_native_select(elem, value, fname)
             elif tag == "textarea" or input_type in ("text", "email", "tel", "url", "number", ""):
                 await elem.click()
                 await elem.fill("")
@@ -843,6 +811,84 @@ class GreenhouseBidEngine(BasePlatformEngine):
                 return True
         except Exception as e:
             logger.warning("greenhouse_fill_error", field=fname, error=str(e))
+        return False
+
+    async def _fill_react_select(self, page, elem, value: str, fname: str) -> bool:
+        """Fill a React Select component by finding the option position and using ArrowDown.
+
+        Strategy: click to open → find which position the target option is at →
+        press ArrowDown that many times → Enter to confirm.
+        """
+        try:
+            # Click to open the dropdown
+            await elem.click()
+            await asyncio.sleep(0.5)
+
+            # Look for the dropdown menu options
+            options = await page.query_selector_all('[class*="select__option"], [class*="option"], [id*="option"]')
+
+            if options:
+                # Find which option index matches our value
+                target_index = -1
+                for i, opt in enumerate(options):
+                    text = (await opt.inner_text()).strip().lower()
+                    if value.lower() == text or value.lower() in text:
+                        target_index = i
+                        break
+
+                if target_index >= 0:
+                    # Press ArrowDown to reach the target option
+                    for _ in range(target_index + 1):
+                        await page.keyboard.press("ArrowDown")
+                        await asyncio.sleep(0.1)
+                    await page.keyboard.press("Enter")
+                    logger.debug("greenhouse_react_select_filled", field=fname, value=value, index=target_index)
+                    return True
+
+            # Fallback: type to filter, ArrowDown once, Enter
+            await elem.fill(value)
+            await asyncio.sleep(0.6)
+            await page.keyboard.press("ArrowDown")
+            await asyncio.sleep(0.15)
+            await page.keyboard.press("Enter")
+            logger.debug("greenhouse_react_select_filled_by_typing", field=fname, value=value)
+            return True
+
+        except Exception as e:
+            logger.warning("greenhouse_react_select_failed", field=fname, error=str(e))
+            # Escape to close any open dropdown
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+            return False
+
+    async def _fill_native_select(self, elem, value: str, fname: str) -> bool:
+        """Fill a native <select> element."""
+        # Try label first, then value
+        for strategy in ["label", "value"]:
+            try:
+                if strategy == "label":
+                    await elem.select_option(label=value)
+                else:
+                    await elem.select_option(value=value)
+                return True
+            except Exception:
+                continue
+        # Partial text match
+        try:
+            options = await elem.query_selector_all("option")
+            val_lower = value.lower()
+            for opt in options:
+                text = (await opt.inner_text()).strip().lower()
+                if val_lower in text or text in val_lower:
+                    opt_value = await opt.get_attribute("value")
+                    if opt_value:
+                        await elem.select_option(value=opt_value)
+                        return True
+        except Exception:
+            pass
+        logger.warning("greenhouse_native_select_failed", field=fname, value=value)
         return False
 
     async def _find_field_by_label(self, page, label_text: str):
