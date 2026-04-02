@@ -282,7 +282,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
             await asyncio.sleep(random.uniform(1.5, 3.0))
 
             # Step 6 — fill fields
-            filled = await self._fill_form(page, job, field_map, resume_path, cover_letter_path)
+            filled = await self._fill_form(page, job, field_map, resume_path, cover_letter_path, profile)
 
             # Take screenshot of filled form
             screenshot = None
@@ -583,6 +583,7 @@ class GreenhouseBidEngine(BasePlatformEngine):
         field_map: dict[str, str],
         resume_path: str,
         cover_letter_path: str | None,
+        profile: UserProfile | None = None,
     ) -> int:
         """Fill the Greenhouse application form in the browser.
 
@@ -671,7 +672,83 @@ class GreenhouseBidEngine(BasePlatformEngine):
             if cl_uploaded:
                 filled += 1
 
+        # --- Pass 3: Handle built-in Greenhouse widgets (not in API) ---
+        if profile:
+            filled += await self._fill_builtin_widgets(page, profile)
+
         logger.info("greenhouse_form_filled", fields_filled=filled)
+        return filled
+
+    async def _fill_builtin_widgets(self, page, profile: UserProfile) -> int:
+        """Fill Greenhouse built-in widgets that aren't exposed in the API.
+
+        These include:
+        - Country phone code dropdown (select next to phone input)
+        - Location (City) autocomplete field
+        """
+        filled = 0
+
+        # --- Country phone code dropdown ---
+        # Greenhouse renders a <select> for country code next to the phone input.
+        # It typically has id/name containing "country" or is a <select> inside
+        # the same container as the phone input.
+        country = profile.location.split(",")[0].strip() if profile.location else ""
+        try:
+            # Common selectors for the country dropdown
+            country_selectors = [
+                'select[name*="country"]',
+                'select[id*="country"]',
+                '#job_application_country',
+                'select.country-select',
+                '.field--country select',
+            ]
+            for sel in country_selectors:
+                elem = await page.query_selector(sel)
+                if elem:
+                    # Try "United States" and common variations
+                    for label in ["United States", "US", "United States of America", "USA"]:
+                        try:
+                            await elem.select_option(label=label)
+                            filled += 1
+                            logger.debug("greenhouse_country_filled", label=label)
+                            break
+                        except Exception:
+                            continue
+                    break
+        except Exception as e:
+            logger.debug("greenhouse_country_widget_failed", error=str(e))
+
+        # --- Location (City) field ---
+        # Some Greenhouse forms have a Location/City field that's an autocomplete
+        # widget, not a standard input. It's usually labeled "Location (City)".
+        location = profile.location or ""
+        if location:
+            try:
+                location_selectors = [
+                    '#job_application_location',
+                    'input[name*="location"]',
+                    'input[id*="location"]',
+                    'input[placeholder*="city"]',
+                    'input[placeholder*="City"]',
+                    'input[autocomplete="address-level2"]',
+                ]
+                for sel in location_selectors:
+                    elem = await page.query_selector(sel)
+                    if elem:
+                        current = await elem.input_value()
+                        if not current:  # Don't overwrite if already filled
+                            await elem.click()
+                            await elem.fill("")
+                            await elem.type(location, delay=random.uniform(30, 60))
+                            # Wait for autocomplete suggestions and press Enter
+                            await asyncio.sleep(1.0)
+                            await page.keyboard.press("Enter")
+                            filled += 1
+                            logger.debug("greenhouse_location_filled", value=location)
+                        break
+            except Exception as e:
+                logger.debug("greenhouse_location_widget_failed", error=str(e))
+
         return filled
 
     async def _fill_element(self, page, elem, value: str, fname: str) -> bool:
