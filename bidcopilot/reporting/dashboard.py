@@ -1055,9 +1055,27 @@ async def api_autobid_test(body: dict, request: Request):
 
     from bidcopilot.application.platforms.greenhouse import GreenhouseBidEngine
     from bidcopilot.profile.manager import ProfileManager
+    from bidcopilot.profile.schemas import UserProfile
 
-    pm = ProfileManager(_config.profile_path)
-    profile = pm.load()
+    # Try to load profile from logged-in user's CVCopilot account first
+    profile = None
+    user = _get_user(request)
+    token = getattr(request.state, "token", None)
+    if token:
+        try:
+            remote = await _auth_client.get_profile(token)
+            if remote:
+                pm = ProfileManager(_config.profile_path)
+                profile = pm.merge_with_remote(remote)
+                logger.info("autobid_using_remote_profile", name=profile.full_name)
+        except Exception as e:
+            logger.warning("autobid_remote_profile_failed", error=str(e))
+
+    # Fallback to local YAML profile
+    if not profile:
+        pm = ProfileManager(_config.profile_path)
+        profile = pm.load()
+        logger.info("autobid_using_local_profile", name=profile.full_name)
 
     engine = GreenhouseBidEngine(headless=False)
 

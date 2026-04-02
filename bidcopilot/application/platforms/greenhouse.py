@@ -577,40 +577,66 @@ class GreenhouseBidEngine(BasePlatformEngine):
     ) -> int:
         """Fill the Greenhouse application form in the browser.
 
-        Greenhouse forms use ``name`` attributes that match the API field
-        names, so we look up each field by ``[name="..."]``.
+        Greenhouse forms use varying selectors depending on the board type:
+        - Standard: ``[name="first_name"]``, ``#first_name``
+        - Embedded: ``[autocomplete="given-name"]``, ``[data-field="first_name"]``
+        - Custom questions: ``[name*="question_"]``, ``[id*="question_"]``
+
+        We try multiple selector strategies for each field.
         """
         filled = 0
 
         for fname, value in field_map.items():
             if value in ("SKIP", "NEEDS_HUMAN_INPUT"):
                 continue
-            selector = f'[name="{fname}"]'
-            try:
-                elem = await page.query_selector(selector)
-                if not elem:
-                    # Try with common Greenhouse nested attribute names
-                    alt_selector = f'[name*="{fname}"]'
-                    elem = await page.query_selector(alt_selector)
-                if not elem:
-                    logger.debug("greenhouse_field_not_found", name=fname)
+
+            # Build a list of selectors to try, from most specific to broadest
+            selectors = [
+                f'[name="{fname}"]',
+                f'#{fname}',
+                f'[id="{fname}"]',
+                f'[name*="{fname}"]',
+                f'[id*="{fname}"]',
+                f'[data-field="{fname}"]',
+            ]
+
+            elem = None
+            for sel in selectors:
+                try:
+                    elem = await page.query_selector(sel)
+                    if elem:
+                        break
+                except Exception:
                     continue
 
+            if not elem:
+                logger.debug("greenhouse_field_not_found", name=fname, selectors=selectors[:3])
+                continue
+
+            try:
                 tag = await elem.evaluate("el => el.tagName.toLowerCase()")
                 input_type = await elem.get_attribute("type") or ""
 
                 await asyncio.sleep(random.uniform(0.2, 0.8))
 
                 if tag == "select":
-                    await elem.select_option(value=value)
+                    # Try by value first, then by label
+                    try:
+                        await elem.select_option(value=value)
+                    except Exception:
+                        try:
+                            await elem.select_option(label=value)
+                        except Exception:
+                            logger.warning("greenhouse_select_failed", field=fname, value=value)
                 elif tag == "textarea" or input_type in ("text", "email", "tel", "url", "number", ""):
+                    await elem.click()
                     await elem.fill("")
-                    # Type character-by-character for a human-like feel
                     await elem.type(value, delay=random.uniform(30, 80))
                 elif input_type in ("checkbox", "radio"):
                     await elem.check()
 
                 filled += 1
+                logger.debug("greenhouse_field_filled", name=fname, tag=tag)
             except Exception as e:
                 logger.warning("greenhouse_fill_error", field=fname, error=str(e))
 
