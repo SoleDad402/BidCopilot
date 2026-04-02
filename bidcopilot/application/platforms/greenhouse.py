@@ -690,31 +690,52 @@ class GreenhouseBidEngine(BasePlatformEngine):
 
         # --- Country phone code dropdown ---
         # Greenhouse renders a <select> for country code next to the phone input.
-        # It typically has id/name containing "country" or is a <select> inside
-        # the same container as the phone input.
-        country = profile.location.split(",")[0].strip() if profile.location else ""
+        # It uses various selectors and option formats across board themes.
         try:
-            # Common selectors for the country dropdown
-            country_selectors = [
-                'select[name*="country"]',
-                'select[id*="country"]',
-                '#job_application_country',
-                'select.country-select',
-                '.field--country select',
-            ]
-            for sel in country_selectors:
-                elem = await page.query_selector(sel)
-                if elem:
-                    # Try "United States" and common variations
-                    for label in ["United States", "US", "United States of America", "USA"]:
+            # Find ALL select elements on page — the country one is usually small
+            all_selects = await page.query_selector_all("select")
+            for elem in all_selects:
+                elem_name = await elem.get_attribute("name") or ""
+                elem_id = await elem.get_attribute("id") or ""
+                elem_class = await elem.get_attribute("class") or ""
+                # Check if this looks like a country selector
+                if any(kw in (elem_name + elem_id + elem_class).lower() for kw in ("country", "phone_country", "dialcode")):
+                    # Try multiple value/label formats for US
+                    for attempt in [
+                        {"label": "United States +1"},
+                        {"label": "United States"},
+                        {"label": "United States (+1)"},
+                        {"label": "US"},
+                        {"value": "US"},
+                        {"value": "us"},
+                        {"value": "United States"},
+                        {"value": "1"},
+                    ]:
                         try:
-                            await elem.select_option(label=label)
+                            await elem.select_option(**attempt)
                             filled += 1
-                            logger.debug("greenhouse_country_filled", label=label)
+                            logger.info("greenhouse_country_filled", attempt=attempt)
                             break
                         except Exception:
                             continue
                     break
+
+            # Fallback: find any select inside a container labeled "Country"
+            if filled == 0:
+                country_label = await page.query_selector('label:has-text("Country")')
+                if country_label:
+                    parent = await country_label.evaluate_handle("el => el.closest('.field') || el.parentElement")
+                    if parent:
+                        sel_elem = await parent.query_selector("select")
+                        if sel_elem:
+                            for attempt in [{"label": "United States +1"}, {"label": "United States"}, {"value": "US"}, {"value": "1"}]:
+                                try:
+                                    await sel_elem.select_option(**attempt)
+                                    filled += 1
+                                    logger.info("greenhouse_country_filled_by_label", attempt=attempt)
+                                    break
+                                except Exception:
+                                    continue
         except Exception as e:
             logger.debug("greenhouse_country_widget_failed", error=str(e))
 
