@@ -104,9 +104,20 @@ def _get_token(request: Request) -> str | None:
     return getattr(request.state, "token", None)
 
 
+def _load_version() -> str:
+    """Load version from version.json."""
+    try:
+        import json
+        with open("version.json") as f:
+            return json.load(f).get("version", "?")
+    except Exception:
+        return "?"
+
+_app_version = _load_version()
+
 def _template_ctx(request: Request, **extra) -> dict:
     """Build template context with user info for header display."""
-    ctx = {"request": request, "user": _get_user(request), "auth_enabled": _config.auth_enabled}
+    ctx = {"request": request, "user": _get_user(request), "auth_enabled": _config.auth_enabled, "version": _app_version}
     ctx.update(extra)
     return ctx
 
