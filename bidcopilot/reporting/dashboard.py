@@ -115,7 +115,7 @@ def _template_ctx(request: Request, **extra) -> dict:
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", context={"request": request})
+    return templates.TemplateResponse(request, "login.html")
 
 
 @app.post("/api/auth/login")
@@ -157,19 +157,19 @@ async def api_logout():
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", context=_template_ctx(request, active_page="dashboard"))
+    return templates.TemplateResponse(request, "dashboard.html", _template_ctx(request, active_page="dashboard"))
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
-    return templates.TemplateResponse("profile.html", context=_template_ctx(request, active_page="profile"))
+    return templates.TemplateResponse(request, "profile.html", _template_ctx(request, active_page="profile"))
 
 @app.get("/monitor", response_class=HTMLResponse)
 async def monitor_page(request: Request):
-    return templates.TemplateResponse("monitor.html", context=_template_ctx(request, active_page="monitor"))
+    return templates.TemplateResponse(request, "monitor.html", _template_ctx(request, active_page="monitor"))
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    return templates.TemplateResponse("admin.html", context=_template_ctx(request, active_page="admin"))
+    return templates.TemplateResponse(request, "admin.html", _template_ctx(request, active_page="admin"))
 
 
 # ───── Stats API ─────
@@ -1024,7 +1024,7 @@ async def update_discovery_config(body: dict):
 
 @app.get("/discovery-settings", response_class=HTMLResponse)
 async def discovery_settings_page(request: Request):
-    return templates.TemplateResponse("discovery_settings.html", context=_template_ctx(request, active_page="discovery"))
+    return templates.TemplateResponse(request, "discovery_settings.html", _template_ctx(request, active_page="discovery"))
 
 
 # ───── Startup ─────
