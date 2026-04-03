@@ -1108,7 +1108,16 @@ async def api_autobid_preview(body: dict, request: Request):
         elif isinstance(value, str) and value != "NEEDS_HUMAN_INPUT":
             display_value = value
 
-        source = "file" if is_file else "profile" if display_value else "needs_input"
+        # Determine source: select fields with options but no value => needs_selection
+        if is_file:
+            source = "file"
+        elif display_value:
+            source = "profile"
+        elif values and ftype and "select" in ftype:
+            source = "needs_selection"
+        else:
+            source = "needs_input"
+
         fields.append({
             "name": fname, "label": label, "type": ftype,
             "value": display_value,
@@ -1148,6 +1157,7 @@ async def api_autobid_generate(body: dict, request: Request):
 
     CVCopilot has full access to the user's profile (employment history,
     education, skills) and produces better, more personalized answers.
+    Supports select/dropdown fields when `options` is provided.
     """
     question = body.get("question", "")
     if not question:
@@ -1156,6 +1166,29 @@ async def api_autobid_generate(body: dict, request: Request):
     token = getattr(request.state, "token", None)
     if not token:
         raise HTTPException(401, "Authentication required")
+
+    # Build user profile context from local profile for richer answers
+    user_profile = body.get("user_profile")
+    if not user_profile:
+        try:
+            profile = await _load_autobid_profile(request)
+            user_profile = {
+                "full_name": profile.full_name,
+                "current_title": profile.current_title,
+                "location": profile.location,
+                "preferred_pronouns": getattr(profile, "preferred_pronouns", ""),
+                "skills": [{"name": s.name} for s in profile.skills[:20]],
+                "employment_history": [
+                    {"title": w.title, "company": w.company}
+                    for w in (profile.work_experience or [])[:3]
+                ],
+                "education": [
+                    {"degree": e.degree, "field_of_study": e.field_of_study, "school_name": e.school_name}
+                    for e in (profile.education or [])[:2]
+                ],
+            }
+        except Exception:
+            pass
 
     import httpx
     try:
@@ -1170,6 +1203,8 @@ async def api_autobid_generate(body: dict, request: Request):
                     "job_description": body.get("job_description", ""),
                     "sample_answers": body.get("sample_answers", []),
                     "resume_text": body.get("resume_text", ""),
+                    "options": body.get("options"),
+                    "user_profile": user_profile,
                 },
             )
             if resp.status_code != 200:

@@ -171,6 +171,7 @@ function renderJobCard() {
 function renderStats() {
   const filled = _fields.filter(f => f.source === 'profile').length;
   const needsInput = _fields.filter(f => f.source === 'needs_input').length;
+  const needsSelection = _fields.filter(f => f.source === 'needs_selection').length;
   const files = _fields.filter(f => f.source === 'file').length;
   const el = document.getElementById('stats');
   el.style.display = 'flex';
@@ -180,6 +181,9 @@ function renderStats() {
     </div>
     <div class="ab-stat" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);">
       <strong style="color:#f59e0b;">${needsInput}</strong> <span>Need Input</span>
+    </div>
+    <div class="ab-stat" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);">
+      <strong style="color:#8b5cf6;">${needsSelection}</strong> <span>Need Selection</span>
     </div>
     <div class="ab-stat" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">
       <strong style="color:#6366f1;">${files}</strong> <span>File Uploads</span>
@@ -199,9 +203,11 @@ function renderFields() {
   for (const f of _fields) {
     const badgeClass = f.source === 'profile' ? 'ab-badge-green'
       : f.source === 'file' ? 'ab-badge-blue'
+      : f.source === 'needs_selection' ? 'ab-badge-purple'
       : 'ab-badge-amber';
     const badgeLabel = f.source === 'profile' ? 'Profile'
       : f.source === 'file' ? 'File Upload'
+      : f.source === 'needs_selection' ? 'Needs Selection'
       : 'Needs Input';
 
     const req = f.required ? '<span class="required">*</span>' : '';
@@ -213,13 +219,13 @@ function renderFields() {
       const display = f.value.length > 80 ? f.value.slice(0, 80) + '...' : f.value;
       valueHtml = `<span style="color:#166534;">${escHtml(display)}</span>`;
     } else if (f.options && f.options.length > 0 && f.source !== 'profile') {
-      valueHtml = `<span style="color:var(--text-secondary);">${f.options.slice(0, 4).join(', ')}${f.options.length > 4 ? '...' : ''}</span>`;
+      valueHtml = `<div id="val_${f.name}"><span style="color:var(--text-secondary);">${f.options.slice(0, 4).join(', ')}${f.options.length > 4 ? '...' : ''}</span></div>`;
     } else {
       valueHtml = `<div id="val_${f.name}"><span style="color:#92400e;font-style:italic;">Requires answer</span></div>`;
     }
 
     let actionsHtml = '';
-    if (f.source === 'needs_input') {
+    if (f.source === 'needs_input' || f.source === 'needs_selection') {
       actionsHtml = `
         <button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${f.name}', '${escAttr(f.label)}')">Auto-gen</button>
         <button class="ab-btn ab-btn-sm ab-btn-outline" onclick="manualEdit('${f.name}', '${escAttr(f.label)}')">Edit</button>
@@ -239,32 +245,100 @@ function renderFields() {
 
 async function autoGen(fname, label) {
   const valEl = document.getElementById('val_' + fname);
-  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  const actEl = document.getElementById('row_' + fname)?.querySelector('.ab-field-actions');
   if (!valEl) return;
 
   valEl.innerHTML = '<span class="ab-generating"><span class="ab-spinner"></span> Generating...</span>';
   actEl.innerHTML = '';
 
+  // Find the field to check if it has options (select/dropdown)
+  const field = _fields.find(f => f.name === fname);
+  const hasOptions = field && field.options && field.options.length > 0;
+
   try {
+    const payload = {
+      question: label,
+      job_title: _job.title,
+      company: _job.company,
+      job_description: _job.description || '',
+      resume_text: _resumeText,
+    };
+    // Pass options for select fields so LLM picks from them
+    if (hasOptions) {
+      payload.options = field.options;
+    }
+
     const resp = await fetch('/api/autobid/generate-answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question: label,
-        job_title: _job.title,
-        company: _job.company,
-        job_description: _job.description || '',
-        resume_text: _resumeText,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.detail || 'Failed');
 
-    showEditableAnswer(fname, label, data.answer);
+    if (hasOptions && data.selected && data.selected.length > 0) {
+      // For select fields, show the selected option(s) with option chips
+      showSelectAnswer(fname, label, data.selected, field.options);
+    } else {
+      showEditableAnswer(fname, label, data.answer);
+    }
   } catch (err) {
     valEl.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
     actEl.innerHTML = `<button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${fname}', '${escAttr(label)}')">Retry</button>`;
   }
+}
+
+function showSelectAnswer(fname, label, selected, allOptions) {
+  const valEl = document.getElementById('val_' + fname);
+  const actEl = document.getElementById('row_' + fname)?.querySelector('.ab-field-actions');
+  if (!valEl) return;
+
+  // Store the selected value(s)
+  _customAnswers[fname] = selected.join(' | ');
+
+  // Show selected options as highlighted chips
+  const chipsHtml = allOptions.map(opt => {
+    const isSelected = selected.some(s => s.toLowerCase() === opt.toLowerCase());
+    return isSelected
+      ? `<span class="ab-badge ab-badge-purple" style="margin:2px;cursor:pointer;" onclick="toggleSelectOption('${fname}', '${escAttr(label)}', '${escAttr(opt)}')">${escHtml(opt)}</span>`
+      : `<span class="ab-badge ab-badge-gray" style="margin:2px;cursor:pointer;opacity:0.6;" onclick="toggleSelectOption('${fname}', '${escAttr(label)}', '${escAttr(opt)}')">${escHtml(opt)}</span>`;
+  }).join('');
+
+  valEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:2px;">${chipsHtml}</div>`;
+  actEl.innerHTML = `
+    <span class="ab-badge ab-badge-purple">Selected</span>
+    <button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${fname}', '${escAttr(label)}')">Re-gen</button>
+  `;
+
+  // Track pattern
+  fetch('/api/autobid/track-pattern', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: label, company: _job?.company || '', choice: 'auto', answer: selected.join(' | ') }),
+  }).catch(() => {});
+
+  updateStats();
+}
+
+function toggleSelectOption(fname, label, option) {
+  const field = _fields.find(f => f.name === fname);
+  if (!field) return;
+
+  const current = (_customAnswers[fname] || '').split(' | ').map(s => s.trim()).filter(Boolean);
+  const idx = current.findIndex(s => s.toLowerCase() === option.toLowerCase());
+  if (idx >= 0) {
+    current.splice(idx, 1);
+  } else {
+    current.push(option);
+  }
+
+  if (current.length > 0) {
+    _customAnswers[fname] = current.join(' | ');
+  } else {
+    delete _customAnswers[fname];
+  }
+
+  showSelectAnswer(fname, label, current, field.options);
 }
 
 function manualEdit(fname, label) {
@@ -274,7 +348,7 @@ function manualEdit(fname, label) {
 
 function showEditableAnswer(fname, label, answer) {
   const valEl = document.getElementById('val_' + fname);
-  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  const actEl = document.getElementById('row_' + fname)?.querySelector('.ab-field-actions');
   if (!valEl) return;
 
   valEl.innerHTML = `<textarea class="ab-textarea" id="edit_${fname}" rows="3">${escHtml(answer)}</textarea>`;
@@ -296,7 +370,7 @@ function acceptAnswer(fname, label) {
   _customAnswers[fname] = answer;
 
   const valEl = document.getElementById('val_' + fname);
-  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  const actEl = document.getElementById('row_' + fname)?.querySelector('.ab-field-actions');
   const display = answer.length > 100 ? answer.slice(0, 100) + '...' : answer;
   valEl.innerHTML = `<span style="color:#5b21b6;" title="${escAttr(answer)}">${escHtml(display)}</span>`;
   actEl.innerHTML = `
@@ -322,7 +396,7 @@ function acceptAnswer(fname, label) {
 function rejectAnswer(fname, label) {
   delete _customAnswers[fname];
   const valEl = document.getElementById('val_' + fname);
-  const actEl = document.querySelector('#row_' + fname + ' .ab-field-actions');
+  const actEl = document.getElementById('row_' + fname)?.querySelector('.ab-field-actions');
   valEl.innerHTML = '<span style="color:#92400e;font-style:italic;">Requires answer</span>';
   actEl.innerHTML = `
     <button class="ab-btn ab-btn-sm" style="background:#8b5cf6;" onclick="autoGen('${fname}', '${escAttr(label)}')">Auto-gen</button>
@@ -334,11 +408,16 @@ function rejectAnswer(fname, label) {
 function updateStats() {
   const answered = Object.keys(_customAnswers).length;
   const needsInput = _fields.filter(f => f.source === 'needs_input').length;
-  const remaining = needsInput - answered;
+  const needsSelection = _fields.filter(f => f.source === 'needs_selection').length;
+  const totalNeedsAction = needsInput + needsSelection;
+  const remaining = Math.max(0, totalNeedsAction - answered);
   // Update the needs input stat
   const statEls = document.querySelectorAll('.ab-stat');
   if (statEls[1]) {
-    statEls[1].innerHTML = `<strong style="color:#f59e0b;">${remaining}</strong> <span>Need Input</span>`;
+    statEls[1].innerHTML = `<strong style="color:#f59e0b;">${_fields.filter(f => f.source === 'needs_input' && !_customAnswers[f.name]).length}</strong> <span>Need Input</span>`;
+  }
+  if (statEls[2]) {
+    statEls[2].innerHTML = `<strong style="color:#8b5cf6;">${_fields.filter(f => f.source === 'needs_selection' && !_customAnswers[f.name]).length}</strong> <span>Need Selection</span>`;
   }
 }
 

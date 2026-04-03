@@ -707,7 +707,9 @@ class GreenhouseBidEngine(BasePlatformEngine):
         # --- Country phone code selector ---
         # Greenhouse uses a React Select component (not native <select>).
         # We find the input by id="country", click it, type to search, then
-        # press ArrowDown + Enter to select the first match (United States).
+        # press ArrowDown + Enter to select the first match.
+        # Use profile country if available, default to "United States".
+        country_name = getattr(profile, "country", "") or "United States"
         try:
             country_input = await page.query_selector('#country')
             if not country_input:
@@ -720,23 +722,23 @@ class GreenhouseBidEngine(BasePlatformEngine):
             if country_input:
                 await country_input.click()
                 await asyncio.sleep(0.3)
-                await country_input.fill("United States")
+                await country_input.fill(country_name)
                 await asyncio.sleep(0.8)  # Wait for dropdown options to filter
                 await page.keyboard.press("ArrowDown")
                 await asyncio.sleep(0.2)
                 await page.keyboard.press("Enter")
                 filled += 1
-                logger.info("greenhouse_country_filled_react_select")
+                logger.info("greenhouse_country_filled_react_select", country=country_name)
             else:
                 # Last resort: try native <select> elements
                 for sel in ['select[name*="country"]', 'select[id*="country"]']:
                     elem = await page.query_selector(sel)
                     if elem:
-                        for attempt in [{"label": "United States +1"}, {"label": "United States"}, {"value": "US"}]:
+                        for attempt in [{"label": f"{country_name} +1"}, {"label": country_name}, {"value": "US"}]:
                             try:
                                 await elem.select_option(**attempt)
                                 filled += 1
-                                logger.info("greenhouse_country_filled_native", attempt=attempt)
+                                logger.info("greenhouse_country_filled_native", attempt=attempt, country=country_name)
                                 break
                             except Exception:
                                 continue
